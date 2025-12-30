@@ -1,0 +1,686 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  firstName String
+  lastName  String
+  
+  roleId    String
+  role      Role     @relation(fields: [roleId], references: [id])
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  auditLogs AuditLog[]
+  notifications Notification[]
+  employeeProfile EmployeeProfile?
+  attendanceRecords AttendanceRecord[]
+  leaveBalances LeaveBalance[]
+  leaveRequests LeaveRequest[]
+  compensations Compensation[]
+  interviews    Interview[] // as interviewer
+  assignedTasks Task[]
+  managedDepartments Department[] @relation("DeptManager")
+  ledTeam           Team?       @relation("TeamLeader")
+  
+  teamId            String?
+  team              Team?       @relation("TeamMembers", fields: [teamId], references: [id])
+  
+  ownedBoards       Board[]         @relation("BoardOwner")
+  createdPlans      Plan[]          @relation("PlanCreator")
+  ownedEpics        Epic[]          @relation("EpicOwner")
+  createdEpics      Epic[]          @relation("EpicCreator")
+  createdTasks      Task[]          @relation("TaskCreator")
+  
+  boardAccess       BoardAccess[]
+  taskAssignments   TaskAssignment[]
+  taskComments      TaskComment[]
+  taskAttachments   TaskAttachment[]
+  taskActivities    TaskActivity[]
+  savedQueries      SavedQuery[]
+
+  awards            Award[]
+  overtimeRequests  OvertimeRequest[]
+  uploadedDocuments DocumentArchive[]
+  
+  projects          Project[]       @relation("ProjectMembers")
+}
+
+model Role {
+  id          String   @id @default(uuid())
+  name        String   @unique // Admin, HR, Manager, Employee, TeamLeader
+  permissions String[]
+  users       User[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Department {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  managerId String?
+  manager   User?    @relation("DeptManager", fields: [managerId], references: [id])
+  teams     Team[]
+  positions Position[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Team {
+  id           String   @id @default(uuid())
+  name         String
+  leaderId     String?  @unique
+  leader       User?    @relation("TeamLeader", fields: [leaderId], references: [id])
+  departmentId String
+  department   Department @relation(fields: [departmentId], references: [id])
+  members      User[]   @relation("TeamMembers")
+  
+  boardAccess     BoardAccess[]
+  taskAssignments TaskAssignment[]
+  
+  createdAt    DateTime @default(now())
+}
+
+model Position {
+  id           String     @id @default(uuid())
+  title        String
+  departmentId String
+  department   Department @relation(fields: [departmentId], references: [id])
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+}
+
+model Job {
+  id          String   @id @default(uuid())
+  title       String
+  description String
+  department  String?  
+  location    String?  
+  type        String?
+  level       String?  // Fresh, Junior, Mid-Level, Senior, TeamLead, Manager
+  isActive    Boolean  @default(false)
+  status      String   @default("OPEN") // OPEN, CLOSED
+  applicants  Applicant[]
+  createdAt   DateTime @default(now())
+}
+
+model Applicant {
+  id              String   @id @default(uuid())
+  firstName       String
+  lastName        String
+  email           String
+  phone           String?
+  resumeUrl       String?
+  linkedinUrl     String?
+  experienceYears Int?
+  residence       String?
+  status          String   @default("NEW") // NEW, SCREENING, INTERVIEW, OFFER, HIRED, REJECTED
+  jobId           String?
+  job             Job?     @relation(fields: [jobId], references: [id])
+  interviews      Interview[]
+  createdAt       DateTime @default(now())
+}
+
+model InterviewQuestion {
+  id          String   @id @default(uuid())
+  question    String
+  category    String?
+  createdAt   DateTime @default(now())
+}
+
+model Interview {
+  id          String   @id @default(uuid())
+  applicantId String
+  applicant   Applicant @relation(fields: [applicantId], references: [id])
+  interviewerId String
+  interviewer User     @relation(fields: [interviewerId], references: [id])
+  date        DateTime
+  status      String   @default("SCHEDULED") // SCHEDULED, COMPLETED, CANCELLED
+  feedback    String?
+  score       Int?
+  
+  createdAt   DateTime @default(now())
+}
+
+model LeaveType {
+  id          String   @id @default(uuid())
+  name        String   @unique // Annual, Sick, Unpaid
+  defaultDays Int      @default(21)
+  balances    LeaveBalance[]
+  requests    LeaveRequest[]
+}
+
+model LeaveBalance {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  leaveTypeId String
+  leaveType   LeaveType @relation(fields: [leaveTypeId], references: [id])
+  balance     Float    @default(0)
+  year        Int      @default(2025)
+
+  @@unique([userId, leaveTypeId, year])
+}
+
+model LeaveRequest {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  leaveTypeId String
+  leaveType   LeaveType @relation(fields: [leaveTypeId], references: [id])
+  startDate   DateTime
+  endDate     DateTime
+  reason      String?
+  status      String   @default("PENDING") // PENDING, APPROVED, REJECTED, CANCELLED
+  approverId  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Compensation {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  type        String   // AWARD, DEDUCTION
+  amount      Float
+  description String?
+  date        DateTime @default(now())
+  
+  createdAt   DateTime @default(now())
+}
+
+model Project {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  department  String?  
+  startDate   DateTime? 
+  endDate     DateTime? 
+  status      String   @default("ACTIVE") // ACTIVE, COMPLETED, ARCHIVED
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  tasks       Task[]
+  milestones  Milestone[]
+  plans       Plan[]
+  members     User[]   @relation("ProjectMembers")
+}
+
+// Task migrated to Project Management module section
+
+
+model Milestone {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  date        DateTime
+  isCompleted Boolean  @default(false)
+  
+  // Link to Plan (New Hierarchy)
+  planId      String? // Optional for migration
+  plan        Plan?   @relation(fields: [planId], references: [id])
+  
+  // Keep Project link for now but it should surely be derived from Plan eventually
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id])
+  
+  tasks       Task[]
+  
+  createdAt   DateTime @default(now())
+}
+
+model AttendanceRecord {
+  id              String   @id @default(uuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id])
+  date            DateTime @default(now()) // Stored as date only mostly
+  
+  checkInTime     DateTime
+  checkInLocation String   // OFFICE, HOME
+  checkInIp       String?
+  checkInProjectId String? // Optional if just logging general work, but requirements say mandatory?
+  checkInTask     String?
+  checkInNotes    String?
+  
+  checkOutTime    DateTime?
+  checkOutLocation String?
+  checkOutIp      String?
+  checkOutProjectId String?
+  checkOutTask    String?
+  checkOutNotes   String?
+  
+  status          String   @default("PRESENT") // PRESENT, ABSENT, LATE
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Setting {
+  key   String @id
+  value String // JSON string or simple value
+}
+
+model Shift {
+  id        String   @id @default(uuid())
+  name      String
+  startTime String   // "09:00"
+  endTime   String   // "17:00"
+}
+
+model Holiday {
+  id          String   @id @default(uuid())
+  name        String
+  date        DateTime
+  isRecurring Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model EmployeeProfile {
+  id            String    @id @default(uuid())
+  userId        String    @unique
+  user          User      @relation(fields: [userId], references: [id])
+  jobTitle      String?
+  profileImage  String?
+  bio           String?
+  skills        String[]
+  dateOfBirth   DateTime?
+  personalEmail String?
+  phoneNumber   String?
+  address       String?
+  joiningDate   DateTime?
+  emergencyContactName  String?
+  emergencyContactPhone String?
+  
+  dependents    Dependent[]
+  documents     EmployeeDocument[]
+  
+  gender        String?
+  employmentStartDate DateTime?
+  employmentEndDate   DateTime?
+  salary              Float?
+  
+  workRegulationId String?
+  workRegulation   WorkRegulation? @relation(fields: [workRegulationId], references: [id])
+  
+  attendanceRequired       Boolean @default(true)
+  tasksLogRequired         Boolean @default(true)
+  workOutsideOfficeAllowed Boolean @default(true)
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Dependent {
+  id              String   @id @default(uuid())
+  name            String
+  relationship    String
+  dateOfBirth     DateTime?
+  employeeProfileId String
+  employeeProfile EmployeeProfile @relation(fields: [employeeProfileId], references: [id])
+}
+
+model EmployeeDocument {
+  id              String   @id @default(uuid())
+  title           String
+  fileUrl         String
+  documentType    String
+  employeeProfileId String
+  employeeProfile EmployeeProfile @relation(fields: [employeeProfileId], references: [id])
+  createdAt       DateTime @default(now())
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  action    String
+  resource  String
+  details   String? // JSON string
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  ipAddress String?
+  createdAt DateTime @default(now())
+}
+
+model WorkRegulation {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  workingDays String[] // e.g. ["Sunday", "Monday", ...]
+  startTime   String?  // "09:00"
+  flexibleHours Int?   // minutes precision, e.g. 120
+  workingHours Float?  // e.g. 8
+  
+  normalLeaveCredit Int? @default(0)
+  casualLeaveCredit Int? @default(0)
+  sickLeaveCredit   Int? @default(0)
+
+  employees   EmployeeProfile[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model AwardType {
+  id          String   @id @default(uuid())
+  name        String
+  image       String?
+  description String?
+  awards      Award[]
+  createdAt   DateTime @default(now())
+}
+
+model Award {
+  id          String   @id @default(uuid())
+  employeeId  String // Linking to User or EmployeeProfile? Usually User for consistency
+  user        User     @relation(fields: [employeeId], references: [id])
+  awardTypeId String
+  awardType   AwardType @relation(fields: [awardTypeId], references: [id])
+  date        DateTime
+  month       String?  // e.g. "January"
+  year        Int?     // e.g. 2025
+  note        String?
+  createdAt   DateTime @default(now())
+}
+
+model OvertimeRequest {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  date        DateTime
+  hours       Float
+  reason      String?
+  status      String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  approverId  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model DocumentArchive {
+  id          String   @id @default(uuid())
+  title       String
+  url         String
+  uploadedBy  String?
+  uploader    User?    @relation(fields: [uploadedBy], references: [id])
+  createdAt   DateTime @default(now())
+}
+
+enum NotificationType {
+  SUCCESS
+  WARNING
+  ERROR
+  ACTION_REQUIRED
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  title     String
+  message   String
+  type      NotificationType
+  isRead    Boolean  @default(false)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+}
+
+
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------
+// Project Management Module
+// ---------------------------------------------------------
+
+enum BoardVisibility {
+  PRIVATE
+  TEAM
+  ORG
+}
+
+enum BoardRole {
+  ADMIN
+  EDITOR
+  VIEWER
+}
+
+enum TaskType {
+  TASK
+  BUG
+  SPIKE
+  CHORE
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum TaskStatus {
+  BACKLOG
+  TODO
+  IN_PROGRESS
+  BLOCKED
+  IN_REVIEW
+  DONE
+  CANCELED
+}
+
+model Board {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  
+  ownerUserId String
+  owner       User     @relation("BoardOwner", fields: [ownerUserId], references: [id])
+  
+  visibility  BoardVisibility @default(TEAM)
+  
+  access      BoardAccess[]
+  plans       Plan[]
+  epics       Epic[]
+  tasks       Task[]
+  queries     SavedQuery[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model BoardAccess {
+  id            String    @id @default(uuid())
+  boardId       String
+  board         Board     @relation(fields: [boardId], references: [id])
+  
+  userId        String?
+  user          User?     @relation(fields: [userId], references: [id])
+  
+  teamId        String?
+  team          Team?     @relation(fields: [teamId], references: [id])
+  
+  role          BoardRole
+  createdAt     DateTime  @default(now())
+  
+  @@unique([boardId, userId])
+  @@unique([boardId, teamId])
+}
+
+
+model Plan {
+  id            String   @id @default(uuid())
+  boardId       String?  // Made optional as we move to Project-centric plans
+  board         Board?   @relation(fields: [boardId], references: [id])
+  
+  projectId     String?  // Optional during migration, but should be filled
+  project       Project? @relation(fields: [projectId], references: [id])
+
+  name          String
+  startDate     DateTime
+  endDate       DateTime
+  status        String   @default("ACTIVE") // DRAFT, ACTIVE, ARCHIVED
+  
+  createdByUserId String
+  createdByUser   User   @relation("PlanCreator", fields: [createdByUserId], references: [id])
+  
+  epics         Epic[]
+  milestones    Milestone[] // New relation
+  tasks         Task[]
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Epic {
+  id            String   @id @default(uuid())
+  boardId       String
+  board         Board    @relation(fields: [boardId], references: [id])
+  
+  planId        String?
+  plan          Plan?    @relation(fields: [planId], references: [id])
+  
+  title         String
+  description   String?
+  priority      TaskPriority @default(MEDIUM)
+  status        String   @default("PROPOSED") // PROPOSED, PLANNED, IN_PROGRESS, DONE, CANCELED
+  
+  ownerUserId   String?
+  owner         User?    @relation("EpicOwner", fields: [ownerUserId], references: [id])
+  
+  tasks         Task[]
+  
+  targetStartDate DateTime?
+  targetEndDate   DateTime?
+  
+  createdByUserId String
+  createdByUser   User     @relation("EpicCreator", fields: [createdByUserId], references: [id])
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Task {
+  id          String   @id @default(uuid())
+  title       String
+  description String?
+  type        TaskType @default(TASK)
+  
+  priority    TaskPriority @default(MEDIUM)
+  status      TaskStatus   @default(TODO)
+  estimatePoints Float?
+
+  boardId     String? // Optional for migration, but ideally required
+  board       Board?  @relation(fields: [boardId], references: [id])
+  
+  planId      String?
+  plan        Plan?   @relation(fields: [planId], references: [id])
+  
+  epicId      String?
+  epic        Epic?   @relation(fields: [epicId], references: [id])
+
+  milestoneId String?
+  milestone   Milestone? @relation(fields: [milestoneId], references: [id])
+
+  // Legacy fields (Deprecating project/assignee direct link in flavor of new module)
+  projectId   String?
+  project     Project? @relation(fields: [projectId], references: [id])
+  
+  assigneeId  String?
+  assignee    User?    @relation(fields: [assigneeId], references: [id])
+  
+  parentTaskId String?
+  parentTask  Task?    @relation("SubTasks", fields: [parentTaskId], references: [id])
+  subTasks    Task[]   @relation("SubTasks")
+  
+  assignments TaskAssignment[]
+  comments    TaskComment[]
+  attachments TaskAttachment[]
+  activity    TaskActivity[]
+  
+  startDate   DateTime?
+  dueDate     DateTime?
+  
+  createdByUserId String?
+  createdByUser   User?   @relation("TaskCreator", fields: [createdByUserId], references: [id])
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model TaskAssignment {
+  id          String   @id @default(uuid())
+  taskId      String
+  task        Task     @relation(fields: [taskId], references: [id])
+  
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id])
+  
+  teamId      String?
+  team        Team?    @relation(fields: [teamId], references: [id])
+  
+  createdAt   DateTime @default(now())
+  
+  @@unique([taskId, userId])
+  @@unique([taskId, teamId])
+}
+
+model TaskComment {
+  id          String   @id @default(uuid())
+  taskId      String
+  task        Task     @relation(fields: [taskId], references: [id])
+  
+  authorUserId String
+  author      User     @relation(fields: [authorUserId], references: [id])
+  
+  body        String
+  createdAt   DateTime @default(now())
+}
+
+model TaskAttachment {
+  id        String   @id @default(uuid())
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id])
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  fileName  String
+  fileUrl   String
+  fileType  String
+  fileSize  Int
+  createdAt DateTime @default(now())
+}
+
+model TaskActivity {
+  id          String   @id @default(uuid())
+  taskId      String
+  task        Task     @relation(fields: [taskId], references: [id])
+  
+  actorUserId String?
+  actor       User?    @relation(fields: [actorUserId], references: [id])
+  
+  action      String   
+  meta        String?  // JSON
+  createdAt   DateTime @default(now())
+}
+
+model SavedQuery {
+  id              String   @id @default(uuid())
+  boardId         String
+  board           Board    @relation(fields: [boardId], references: [id])
+  
+  name            String
+  queryJson       String
+  
+  createdByUserId String
+  createdByUser   User     @relation(fields: [createdByUserId], references: [id])
+  
+  createdAt       DateTime @default(now())
+}
