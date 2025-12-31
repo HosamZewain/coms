@@ -1,10 +1,23 @@
 import { prisma } from '../utils/prisma';
 import { AppError } from '../utils/error';
 
+import { slugify } from '../utils/slug.utils';
+
 export const createProject = async (data: any) => {
+    let slug = slugify(data.name);
+    let counter = 1;
+    let baseSlug = slug;
+
+    // Ensure uniqueness
+    while (await prisma.project.findUnique({ where: { slug } })) {
+        slug = `${baseSlug}-${counter}`;
+        counter++;
+    }
+
     return await prisma.project.create({
         data: {
             name: data.name,
+            slug,
             description: data.description,
             department: data.department,
             startDate: data.startDate ? new Date(data.startDate) : undefined,
@@ -35,9 +48,11 @@ export const getAllProjects = async (filters: any = {}) => {
     });
 };
 
-export const getProjectById = async (id: string) => {
+export const getProjectById = async (idOrSlug: string) => {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrSlug);
+
     const project = await prisma.project.findUnique({
-        where: { id },
+        where: isUuid ? { id: idOrSlug } : { slug: idOrSlug },
         include: {
             tasks: {
                 include: {
@@ -118,10 +133,25 @@ export const updateProject = async (id: string, data: any) => {
     const project = await prisma.project.findUnique({ where: { id } });
     if (!project) throw new AppError('Project not found', 404);
 
+    let slug = project.slug;
+
+    // If name changes, regenerate slug
+    if (data.name && data.name !== project.name) {
+        slug = slugify(data.name);
+        let counter = 1;
+        let baseSlug = slug;
+
+        while (await prisma.project.findUnique({ where: { slug } })) {
+            slug = `${baseSlug}-${counter}`;
+            counter++;
+        }
+    }
+
     return await prisma.project.update({
         where: { id },
         data: {
             ...data,
+            slug,
             startDate: data.startDate ? new Date(data.startDate) : undefined,
             endDate: data.endDate ? new Date(data.endDate) : undefined,
         }

@@ -14,6 +14,7 @@ model User {
   password  String
   firstName String
   lastName  String
+  slug      String?  @unique
   
   roleId    String
   role      Role     @relation(fields: [roleId], references: [id])
@@ -36,6 +37,9 @@ model User {
   teamId            String?
   team              Team?       @relation("TeamMembers", fields: [teamId], references: [id])
   
+  departmentId      String?
+  department        Department? @relation("DeptMembers", fields: [departmentId], references: [id])
+  
   ownedBoards       Board[]         @relation("BoardOwner")
   createdPlans      Plan[]          @relation("PlanCreator")
   ownedEpics        Epic[]          @relation("EpicOwner")
@@ -54,6 +58,9 @@ model User {
   uploadedDocuments DocumentArchive[]
   
   projects          Project[]       @relation("ProjectMembers")
+  
+  approvedLeaves    LeaveRequest[]  @relation("LeaveApprover")
+  approvedOvertime  OvertimeRequest[] @relation("OvertimeApprover")
 }
 
 model Role {
@@ -71,6 +78,7 @@ model Department {
   managerId String?
   manager   User?    @relation("DeptManager", fields: [managerId], references: [id])
   teams     Team[]
+  members   User[]   @relation("DeptMembers")
   positions Position[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -183,6 +191,7 @@ model LeaveRequest {
   reason      String?
   status      String   @default("PENDING") // PENDING, APPROVED, REJECTED, CANCELLED
   approverId  String?
+  approver    User?    @relation("LeaveApprover", fields: [approverId], references: [id])
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
@@ -207,6 +216,7 @@ model Project {
   startDate   DateTime? 
   endDate     DateTime? 
   status      String   @default("ACTIVE") // ACTIVE, COMPLETED, ARCHIVED
+  slug        String?  @unique
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   tasks       Task[]
@@ -399,6 +409,7 @@ model OvertimeRequest {
   reason      String?
   status      String   @default("PENDING") // PENDING, APPROVED, REJECTED
   approverId  String?
+  approver    User?    @relation("OvertimeApprover", fields: [approverId], references: [id])
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
@@ -409,6 +420,7 @@ model DocumentArchive {
   url         String
   uploadedBy  String?
   uploader    User?    @relation(fields: [uploadedBy], references: [id])
+  viewCount   Int      @default(0)
   createdAt   DateTime @default(now())
 }
 

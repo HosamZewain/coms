@@ -21,7 +21,21 @@ export const getDashboardStats = catchAsync(async (req: any, res: Response) => {
     res.json({ status: 'success', data: stats });
 });
 
+// This was for file logs, keeping it or replacing?
+// The user wants "full system log" which implies the new DB audit logs.
+// Let's add a new endpoint for Audit Logs specifically.
+
+import * as auditService from '../services/audit.service';
+
 export const getSystemLogs = catchAsync(async (req: Request, res: Response) => {
+    // Legacy file/console logs
     const logs = await getLogs(100);
+    res.json({ status: 'success', data: logs });
+});
+
+export const getAuditLogs = catchAsync(async (req: Request, res: Response) => {
+    const limit = req.query.limit ? parseInt(req.query.limit as string) : 50;
+    const offset = req.query.offset ? parseInt(req.query.offset as string) : 0;
+    const logs = await auditService.getAuditLogs(limit, offset);
     res.json({ status: 'success', data: logs });
 });

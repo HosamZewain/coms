@@ -1,6 +1,7 @@
 import express from 'express';
 import * as hrController from '../controllers/hr.controller';
 import { authenticate, authorize } from '../middlewares/auth.middleware';
+import { documentUpload } from '../middlewares/document-upload.middleware';
 
 const router = express.Router();
 
@@ -33,6 +34,8 @@ router.patch('/overtime/:id', authorize(['Admin', 'HR', 'Manager']), hrControlle
 // Documents
 router.route('/documents')
     .get(hrController.getDocuments)
-    .post(authorize(['Admin', 'HR']), hrController.uploadDocument); // Assuming only HR uploads globally
+    .post(authorize(['Admin', 'HR']), documentUpload.single('file'), hrController.uploadDocument);
+
+router.post('/documents/:id/view', hrController.incrementView);
 
 export default router;

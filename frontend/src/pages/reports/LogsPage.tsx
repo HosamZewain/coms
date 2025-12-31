@@ -1,357 +1,197 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
-import { Avatar, AvatarFallback } from '../../components/ui/avatar';
 import { Badge } from '../../components/ui/badge';
 import { Input } from '../../components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
+import { Button } from '../../components/ui/button';
 import {
-    Clock, MessageSquare, UserPlus, Edit, CheckCircle, AlertCircle,
-    Search, Filter, Calendar, ListFilter
-} from 'lucide-react';
-import { formatDistanceToNow, format } from 'date-fns';
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "../../components/ui/table";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+} from "../../components/ui/dialog";
+import { Search, RotateCw, Eye } from 'lucide-react';
+import { format } from 'date-fns';
 import api from '../../lib/api';
-import { useNavigate } from 'react-router-dom';
 
 export default function LogsPage() {
-    const navigate = useNavigate();
     const [searchQuery, setSearchQuery] = useState('');
-    const [actionFilter, setActionFilter] = useState<string>('all');
-    const [userFilter, setUserFilter] = useState<string>('all');
-    const [moduleFilter, setModuleFilter] = useState<string>('all');
+    const [page, setPage] = useState(0);
+    const [viewDetails, setViewDetails] = useState<any | null>(null);
 
-    const { data: activities, isLoading } = useQuery({
-        queryKey: ['all-activities'],
+    const { data: logs, isLoading, refetch } = useQuery({
+        queryKey: ['audit-logs', page],
         queryFn: async () => {
-            const res = await api.get('/activities/recent?limit=100');
+            // Assuming we adding a new route for audit logs or using existing report route
+            const res = await api.get(`/reporting/audit-logs?limit=50&offset=${page * 50}`);
             return res.data.data;
         },
-        refetchInterval: 30000
+        refetchInterval: 10000
     });
 
-    const { data: users } = useQuery({
-        queryKey: ['users-for-filter'],
-        queryFn: async () => {
-            const res = await api.get('/employees');
-            return res.data.data || res.data;
-        }
-    });
-
-    const getActivityIcon = (action: string) => {
+    const getActionColor = (action: string) => {
         switch (action) {
-            case 'created': return <CheckCircle className="h-5 w-5 text-green-500" />;
-            case 'updated': return <Edit className="h-5 w-5 text-blue-500" />;
-            case 'status_changed': return <AlertCircle className="h-5 w-5 text-orange-500" />;
-            case 'assigned': return <UserPlus className="h-5 w-5 text-purple-500" />;
-            case 'commented': return <MessageSquare className="h-5 w-5 text-cyan-500" />;
-            default: return <Clock className="h-5 w-5 text-gray-500" />;
+            case 'CREATE': return 'bg-green-100 text-green-800 border-green-200';
+            case 'UPDATE': return 'bg-blue-100 text-blue-800 border-blue-200';
+            case 'DELETE': return 'bg-red-100 text-red-800 border-red-200';
+            default: return 'bg-gray-100 text-gray-800 border-gray-200';
         }
     };
 
-    const getActionBadge = (action: string) => {
-        const variants: Record<string, any> = {
-            created: 'default',
-            updated: 'secondary',
-            status_changed: 'outline',
-            assigned: 'default',
-            commented: 'secondary'
-        };
-        return <Badge variant={variants[action] || 'outline'}>{action.replace('_', ' ')}</Badge>;
-    };
-
-    const getActivityText = (activity: any) => {
-        const actorName = activity.actor
-            ? `${activity.actor.firstName} ${activity.actor.lastName}`
-            : 'Someone';
-        const taskTitle = activity.task?.title || 'a task';
-
-        switch (activity.action) {
-            case 'created':
-                return { actor: actorName, action: 'created', target: taskTitle };
-            case 'updated':
-                return { actor: actorName, action: 'updated', target: taskTitle };
-            case 'status_changed':
-                const meta = activity.meta ? JSON.parse(activity.meta) : {};
-                return {
-                    actor: actorName,
-                    action: 'moved',
-                    target: taskTitle,
-                    detail: `from ${meta.from} to ${meta.to}`
-                };
-            case 'assigned':
-                return { actor: actorName, action: 'assigned', target: taskTitle };
-            case 'commented':
-                return { actor: actorName, action: 'commented on', target: taskTitle };
-            default:
-                return { actor: actorName, action: 'performed an action on', target: taskTitle };
-        }
-    };
-
-    // Determine module for each activity
-    const getActivityModule = (activity: any) => {
-        if (activity.action === 'project_deleted') return 'projects';
-        if (['created', 'updated', 'deleted', 'status_changed', 'assigned', 'commented'].includes(activity.action)) {
-            return 'tasks';
-        }
-        return 'other';
-    };
-
-    // Filter activities
-    const filteredActivities = activities?.filter((activity: any) => {
-        // Module filter
-        if (moduleFilter !== 'all' && getActivityModule(activity) !== moduleFilter) {
-            return false;
-        }
-
-        // Search filter
-        const matchesSearch = searchQuery === '' ||
-            activity.task?.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            (activity.actor?.firstName + ' ' + activity.actor?.lastName).toLowerCase().includes(searchQuery.toLowerCase());
-        if (!matchesSearch) {
-            return false;
-        }
-
-        // Action filter
-        if (actionFilter !== 'all' && activity.action !== actionFilter) {
-            return false;
-        }
-
-        // User filter
-        if (userFilter !== 'all' && activity.actorUserId !== userFilter) {
-            return false;
-        }
-
-        return true;
-    }) || [];
-
-    // Group activities by date
-    const groupedActivities = filteredActivities.reduce((groups: any, activity: any) => {
-        const date = format(new Date(activity.createdAt), 'yyyy-MM-dd');
-        if (!groups[date]) {
-            groups[date] = [];
-        }
-        groups[date].push(activity);
-        return groups;
-    }, {});
+    const filteredLogs = logs?.filter((log: any) =>
+        JSON.stringify(log).toLowerCase().includes(searchQuery.toLowerCase())
+    ) || [];
 
     return (
         <div className="space-y-6">
-            {/* Header */}
-            <div>
-                <h1 className="text-3xl font-bold tracking-tight">Activity Logs</h1>
-                <p className="text-muted-foreground mt-2">
-                    Complete history of all team activities and changes
-                </p>
+            <div className="flex justify-between items-center">
+                <div>
+                    <h1 className="text-3xl font-bold tracking-tight">System Logs</h1>
+                    <p className="text-muted-foreground mt-2">
+                        Comprehensive audit trail of all system actions.
+                    </p>
+                </div>
+                <Button variant="outline" onClick={() => refetch()}>
+                    <RotateCw className="mr-2 h-4 w-4" />
+                    Refresh
+                </Button>
             </div>
 
-            {/* Filters */}
             <Card>
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <Filter className="h-5 w-5" />
-                        Filters
-                    </CardTitle>
+                    <CardTitle>Audit Trail</CardTitle>
+                    <CardDescription>
+                        View details of who did what, when, and from where.
+                    </CardDescription>
+                    <div className="pt-4">
+                        <div className="relative max-w-sm">
+                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                                placeholder="Search logs..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="pl-9"
+                            />
+                        </div>
+                    </div>
                 </CardHeader>
                 <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                        {/* Search */}
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">Search</label>
-                            <div className="relative">
-                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                <Input
-                                    placeholder="Search tasks or users..."
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="pl-9"
-                                />
+                    <div className="rounded-md border">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Time</TableHead>
+                                    <TableHead>Actor</TableHead>
+                                    <TableHead>Action</TableHead>
+                                    <TableHead>Resource</TableHead>
+                                    <TableHead>IP Address</TableHead>
+                                    <TableHead className="text-right">Details</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {isLoading ? (
+                                    <TableRow>
+                                        <TableCell colSpan={6} className="text-center py-8">
+                                            Loading logs...
+                                        </TableCell>
+                                    </TableRow>
+                                ) : filteredLogs.length === 0 ? (
+                                    <TableRow>
+                                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                                            No logs found.
+                                        </TableCell>
+                                    </TableRow>
+                                ) : (
+                                    filteredLogs.map((log: any) => (
+                                        <TableRow key={log.id}>
+                                            <TableCell className="whitespace-nowrap font-medium">
+                                                {format(new Date(log.createdAt), 'MMM d, HH:mm:ss')}
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="flex flex-col">
+                                                    <span className="font-semibold text-sm">
+                                                        {log.user ? `${log.user.firstName} ${log.user.lastName}` : 'System'}
+                                                    </span>
+                                                    <span className="text-xs text-muted-foreground">
+                                                        {log.user?.email || 'N/A'}
+                                                    </span>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getActionColor(log.action)}`}>
+                                                    {log.action}
+                                                </span>
+                                            </TableCell>
+                                            <TableCell className="font-mono text-xs text-muted-foreground">
+                                                {log.resource}
+                                            </TableCell>
+                                            <TableCell className="font-mono text-xs">
+                                                {log.ipAddress || '-'}
+                                            </TableCell>
+                                            <TableCell className="text-right">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() => setViewDetails(log)}
+                                                >
+                                                    <Eye className="h-4 w-4 mr-1" /> View
+                                                </Button>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))
+                                )}
+                            </TableBody>
+                        </Table>
+                    </div>
+                </CardContent>
+            </Card>
+
+            <Dialog open={!!viewDetails} onOpenChange={(open) => !open && setViewDetails(null)}>
+                <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle>Log Details</DialogTitle>
+                        <DialogDescription>
+                            Full payload of the action performed.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                                <span className="font-semibold text-muted-foreground">Action ID:</span>
+                                <p className="font-mono">{viewDetails?.id}</p>
+                            </div>
+                            <div>
+                                <span className="font-semibold text-muted-foreground">Timestamp:</span>
+                                <p>{viewDetails && format(new Date(viewDetails.createdAt), 'PPpp')}</p>
+                            </div>
+                            <div>
+                                <span className="font-semibold text-muted-foreground">User:</span>
+                                <p>{viewDetails?.user?.email}</p>
+                            </div>
+                            <div>
+                                <span className="font-semibold text-muted-foreground">IP Address:</span>
+                                <p>{viewDetails?.ipAddress}</p>
                             </div>
                         </div>
 
-                        {/* Action Filter */}
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">Action Type</label>
-                            <Select value={actionFilter} onValueChange={setActionFilter}>
-                                <SelectTrigger>
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">All Actions</SelectItem>
-                                    <SelectItem value="created">Created</SelectItem>
-                                    <SelectItem value="updated">Updated</SelectItem>
-                                    <SelectItem value="status_changed">Status Changed</SelectItem>
-                                    <SelectItem value="assigned">Assigned</SelectItem>
-                                    <SelectItem value="commented">Commented</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        {/* User Filter */}
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">Team Member</label>
-                            <Select value={userFilter} onValueChange={setUserFilter}>
-                                <SelectTrigger>
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">All Members</SelectItem>
-                                    {users?.map((user: any) => (
-                                        <SelectItem key={user.id} value={user.id}>
-                                            {user.firstName} {user.lastName}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        {/* Module Filter */}
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">Module</label>
-                            <Select value={moduleFilter} onValueChange={setModuleFilter}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="All Modules" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">All Modules</SelectItem>
-                                    <SelectItem value="tasks">Tasks</SelectItem>
-                                    <SelectItem value="projects">Projects</SelectItem>
-                                    <SelectItem value="employees">Employees</SelectItem>
-                                    <SelectItem value="attendance">Attendance</SelectItem>
-                                    <SelectItem value="recruitment">Recruitment</SelectItem>
-                                    <SelectItem value="other">Other</SelectItem>
-                                </SelectContent>
-                            </Select>
+                        <div>
+                            <span className="font-semibold text-muted-foreground mb-2 block">Payload / Changes:</span>
+                            <div className="bg-slate-950 text-slate-50 p-4 rounded-lg overflow-x-auto font-mono text-xs">
+                                <pre>{viewDetails?.details ? JSON.stringify(JSON.parse(viewDetails.details), null, 2) : 'No details recorded.'}</pre>
+                            </div>
                         </div>
                     </div>
-
-                    <div className="mt-4 flex items-center justify-between text-sm">
-                        <p className="text-muted-foreground">
-                            Showing {filteredActivities.length} of {activities?.length || 0} activities
-                        </p>
-                        {(searchQuery || actionFilter !== 'all' || userFilter !== 'all' || moduleFilter !== 'all') && (
-                            <button
-                                className="text-primary hover:underline"
-                                onClick={() => {
-                                    setSearchQuery('');
-                                    setActionFilter('all');
-                                    setUserFilter('all');
-                                    setModuleFilter('all');
-                                }}
-                            >
-                                Clear filters
-                            </button>
-                        )}
-                    </div>
-                </CardContent>
-            </Card>
-
-            {/* Activity Timeline */}
-            <Card>
-                <CardHeader>
-                    <CardTitle>Activity Timeline</CardTitle>
-                    <CardDescription>Chronological view of all team activities</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    {isLoading ? (
-                        <div className="space-y-4">
-                            {[1, 2, 3, 4, 5].map(i => (
-                                <div key={i} className="flex items-start gap-4 animate-pulse">
-                                    <div className="h-10 w-10 rounded-full bg-muted" />
-                                    <div className="flex-1 space-y-2">
-                                        <div className="h-4 bg-muted rounded w-3/4" />
-                                        <div className="h-3 bg-muted rounded w-1/2" />
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    ) : filteredActivities.length === 0 ? (
-                        <div className="text-center py-12">
-                            <ListFilter className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                            <p className="text-lg font-medium">No activities found</p>
-                            <p className="text-sm text-muted-foreground mt-2">
-                                Try adjusting your filters or search term
-                            </p>
-                        </div>
-                    ) : (
-                        <div className="space-y-6 max-h-[600px] overflow-y-auto">
-                            {Object.entries(groupedActivities).map(([date, dateActivities]: [string, any]) => (
-                                <div key={date}>
-                                    {/* Date Header */}
-                                    <div className="flex items-center gap-2 mb-4 sticky top-0 bg-background py-2 z-10">
-                                        <Calendar className="h-4 w-4 text-muted-foreground" />
-                                        <h3 className="font-semibold text-sm">
-                                            {format(new Date(date), 'EEEE, MMMM d, yyyy')}
-                                        </h3>
-                                        <div className="flex-1 h-px bg-border" />
-                                    </div>
-
-                                    {/* Activities for this date */}
-                                    <div className="space-y-3 pl-6 border-l-2 border-border ml-2">
-                                        {dateActivities.map((activity: any) => {
-                                            const text = getActivityText(activity);
-                                            return (
-                                                <div
-                                                    key={activity.id}
-                                                    className="relative hover:bg-accent/50 p-3 rounded-lg cursor-pointer transition-colors -ml-6 pl-6"
-                                                    onClick={() => {
-                                                        if (activity.task?.id) {
-                                                            navigate(`/projects/${activity.task.projectId}?task=${activity.task.id}`);
-                                                        }
-                                                    }}
-                                                >
-                                                    {/* Timeline dot */}
-                                                    <div className="absolute -left-[9px] top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-background border-2 border-primary flex items-center justify-center">
-                                                        <div className="w-2 h-2 rounded-full bg-primary" />
-                                                    </div>
-
-                                                    <div className="flex items-start gap-3">
-                                                        <div className="flex-shrink-0">
-                                                            <Avatar className="h-10 w-10">
-                                                                <AvatarFallback className="text-sm">
-                                                                    {activity.actor
-                                                                        ? activity.actor.firstName[0] + activity.actor.lastName[0]
-                                                                        : '?'}
-                                                                </AvatarFallback>
-                                                            </Avatar>
-                                                        </div>
-                                                        <div className="flex-1 min-w-0">
-                                                            <div className="flex items-start gap-2 flex-wrap">
-                                                                {getActivityIcon(activity.action)}
-                                                                <div>
-                                                                    <p className="text-sm">
-                                                                        <span className="font-medium">{text.actor}</span>
-                                                                        {' '}{text.action}{' '}
-                                                                        <span className="font-medium">"{text.target}"</span>
-                                                                        {text.detail && (
-                                                                            <span className="text-muted-foreground"> {text.detail}</span>
-                                                                        )}
-                                                                    </p>
-                                                                    <div className="flex items-center gap-2 mt-1">
-                                                                        <p className="text-xs text-muted-foreground">
-                                                                            {formatDistanceToNow(new Date(activity.createdAt), { addSuffix: true })}
-                                                                        </p>
-                                                                        <span className="text-xs text-muted-foreground">•</span>
-                                                                        <p className="text-xs text-muted-foreground">
-                                                                            {format(new Date(activity.createdAt), 'h:mm a')}
-                                                                        </p>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                            <div className="mt-2">
-                                                                {getActionBadge(activity.action)}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

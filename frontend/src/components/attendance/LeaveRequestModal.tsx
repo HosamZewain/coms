@@ -49,6 +49,7 @@ export default function LeaveRequestModal({ isOpen, onClose, userId }: LeaveRequ
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>Add Leave Record</DialogTitle>
+                    <div className="text-muted-foreground text-sm">Fill in the details below to create a new leave request.</div>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div className="space-y-2">

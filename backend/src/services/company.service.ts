@@ -5,19 +5,78 @@ import { prisma } from '../utils/prisma';
 
 // Departments
 export const getDepartments = async () => {
-    return await prisma.department.findMany();
+    return await prisma.department.findMany({
+        include: {
+            manager: { select: { firstName: true, lastName: true, id: true, employeeProfile: { select: { profileImage: true } } } },
+            teams: {
+                include: {
+                    leader: { select: { firstName: true, lastName: true, id: true, employeeProfile: { select: { profileImage: true } } } },
+                    _count: { select: { members: true } }
+                }
+            },
+            _count: { select: { teams: true, positions: true } }
+        }
+    });
 };
 
-export const createDepartment = async (name: string) => {
-    return await prisma.department.create({ data: { name } });
+export const createDepartment = async (name: string, managerId?: string) => {
+    return await prisma.department.create({
+        data: {
+            name,
+            managerId
+        }
+    });
 };
 
-export const updateDepartment = async (id: string, name: string) => {
-    return await prisma.department.update({ where: { id }, data: { name } });
+export const updateDepartment = async (id: string, name: string, managerId?: string) => {
+    return await prisma.department.update({
+        where: { id },
+        data: {
+            name,
+            managerId
+        }
+    });
 };
 
 export const deleteDepartment = async (id: string) => {
     return await prisma.department.delete({ where: { id } });
+};
+
+// Teams
+export const getTeams = async (departmentId?: string) => {
+    const where = departmentId ? { departmentId } : {};
+    return await prisma.team.findMany({
+        where,
+        include: {
+            leader: { select: { firstName: true, lastName: true, id: true } },
+            department: { select: { name: true } },
+            _count: { select: { members: true } }
+        }
+    });
+};
+
+export const createTeam = async (data: { name: string, departmentId: string, leaderId?: string }) => {
+    return await prisma.team.create({
+        data: {
+            name: data.name,
+            departmentId: data.departmentId,
+            leaderId: data.leaderId
+        }
+    });
+};
+
+export const updateTeam = async (id: string, data: { name?: string, leaderId?: string }) => {
+    return await prisma.team.update({
+        where: { id },
+        data: {
+            name: data.name,
+            leaderId: data.leaderId
+        }
+    });
+};
+
+export const deleteTeam = async (id: string) => {
+    return await prisma.team.delete({ where: { id } });
 };
 
 // Positions
@@ -60,7 +119,11 @@ export const getSettings = async (keys: string[]) => {
         where: { key: { in: keys } }
     });
     const result: any = {};
-    settings.forEach(s => result[s.key] = s.value === 'true'); // Simple boolean conversion for now
+    settings.forEach(s => {
+        if (s.value === 'true') result[s.key] = true;
+        else if (s.value === 'false') result[s.key] = false;
+        else result[s.key] = s.value;
+    });
     return result;
 };
 

@@ -98,3 +98,10 @@ export const getDocuments = async () => {
         orderBy: { createdAt: 'desc' }
     });
 };
+
+export const incrementDocumentView = async (id: string) => {
+    return await prisma.documentArchive.update({
+        where: { id },
+        data: { viewCount: { increment: 1 } }
+    });
+};

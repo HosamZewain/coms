@@ -23,9 +23,11 @@ const sidebarItems = [
         href: '/hr',
         subItems: [
             { label: 'Employees', href: '/employees' },
+            { label: 'Team Directory', href: '/team' },
             { label: 'Attendance', href: '/attendance' },
             { label: 'Leaves', href: '/attendance/leave' },
             { label: 'Payroll', href: '/hr/payroll' },
+            { label: 'Approvals', href: '/hr/approvals' },
             { label: 'Overtime', href: '/hr/overtime' },
             { label: 'Recruitment', href: '/recruitment' },
             { label: 'Awards', href: '/hr/awards' },
@@ -46,7 +48,7 @@ const sidebarItems = [
         label: 'Settings', // singular in request, plural usually better but 'Setting' requested
         href: '/settings',
         subItems: [
-            { label: 'General', href: '/settings/general' },
+            { label: 'General', href: '/settings/company' },
             { label: 'Roles & Permissions', href: '/settings/roles' },
             { label: 'Departments', href: '/settings/departments' },
             { label: 'Holidays', href: '/settings/holidays' },

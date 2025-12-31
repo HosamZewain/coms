@@ -21,8 +21,8 @@ export const getMyLeaves = catchAsync(async (req: any, res: Response) => {
     res.json({ status: 'success', data });
 });
 
-export const getAllLeaves = catchAsync(async (req: Request, res: Response) => {
-    const data = await leaveService.getAllLeaves();
+export const getAllLeaves = catchAsync(async (req: any, res: Response) => {
+    const data = await leaveService.getAllLeaves(req.user.userId);
     res.json({ status: 'success', data });
 });
 
@@ -35,4 +35,23 @@ export const updateLeaveStatus = catchAsync(async (req: any, res: Response) => {
 export const deleteLeave = catchAsync(async (req: Request, res: Response) => {
     await leaveService.deleteLeaveRequest(req.params.id);
     res.status(204).json({ status: 'success', data: null });
+});
+
+export const getBalances = catchAsync(async (req: Request, res: Response) => {
+    const { userId } = req.params;
+    const year = req.query.year ? parseInt(req.query.year as string) : new Date().getFullYear();
+    const data = await leaveService.getUserBalances(userId, year);
+    res.json({ status: 'success', data });
+});
+
+export const updateBalance = catchAsync(async (req: Request, res: Response) => {
+    const { userId } = req.params;
+    const { leaveTypeId, balance, year } = req.body;
+    const data = await leaveService.updateUserBalance(
+        userId,
+        leaveTypeId,
+        balance,
+        year || new Date().getFullYear()
+    );
+    res.json({ status: 'success', data });
 });

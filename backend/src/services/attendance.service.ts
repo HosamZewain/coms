@@ -1,7 +1,10 @@
 import { PrismaClient } from '@prisma/client';
 import { prisma } from '../utils/prisma';
 import { AppError } from '../utils/error';
-import * as settingsService from './settings.service';
+import * as companyService from './company.service';
+import * as settingsService from './settings.service'; // Keeping this if other methods use it, but switching to companyService for unified settings
+// Actually, let's use companyService since that's where getSettings is defined in previous context.
+
 
 // const prisma = new PrismaClient();
 
@@ -38,11 +41,19 @@ export const punchIn = async (userId: string, data: PunchData) => {
 
     // IP Validation
     if (data.location === 'OFFICE') {
-        const allowedIpsStr = await settingsService.getSetting('ALLOWED_OFFICE_IPS');
-        if (allowedIpsStr) {
-            const allowedIps = allowedIpsStr.split(',').map(ip => ip.trim());
-            if (data.ipAddress && !allowedIps.includes(data.ipAddress)) {
-                throw new AppError('IP Address not allowed for Office Login', 403);
+        const settings = await companyService.getSettings(['office_ip']);
+        const allowedIp = settings['office_ip'];
+
+        if (allowedIp && typeof allowedIp === 'string' && allowedIp.trim().length > 0) {
+            const currentIp = data.ipAddress || '';
+            const normalizedAllowed = allowedIp.trim();
+
+            // Allow multiple IPs separated by comma if needed, but requirements imply singular "office IP"
+            // Let's support comma-separated just in case.
+            const allowedIps = normalizedAllowed.split(',').map(ip => ip.trim());
+
+            if (!allowedIps.includes(currentIp)) {
+                throw new AppError(`Invalid Location: Your IP (${currentIp}) does not match the registered Office IP.`, 403);
             }
         }
     }
@@ -79,6 +90,20 @@ export const punchOut = async (userId: string, data: PunchData) => {
         throw new AppError('No active check-in found', 404);
     }
 
+    // IP Validation for Punch Out (Optional, but good for consistency)
+    if (data.location === 'OFFICE') {
+        const settings = await companyService.getSettings(['office_ip']);
+        const allowedIp = settings['office_ip'];
+
+        if (allowedIp && typeof allowedIp === 'string' && allowedIp.trim().length > 0) {
+            const currentIp = data.ipAddress || '';
+            const allowedIps = allowedIp.split(',').map(ip => ip.trim());
+            if (!allowedIps.includes(currentIp)) {
+                throw new AppError(`Invalid Location: Your IP (${currentIp}) does not match the registered Office IP.`, 403);
+            }
+        }
+    }
+
     return await prisma.attendanceRecord.update({
         where: { id: record.id },
         data: {
@@ -101,7 +126,12 @@ export const getDailyReport = async (date: Date) => {
     // 1. Fetch All Employees (excluding admins if preferred, but usually report includes everyone)
     // 1. Fetch All Employees
     const employees = await prisma.user.findMany({
-        include: { employeeProfile: true, role: true }
+        include: {
+            employeeProfile: {
+                include: { workRegulation: true }
+            },
+            role: true
+        }
     });
 
     // 2. Fetch Attendance Records for the day

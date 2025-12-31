@@ -1,4 +1,4 @@
-# TCOMS - Tech Companies ERP
+# COMS - Companies ERP
 
 ## Setup
 

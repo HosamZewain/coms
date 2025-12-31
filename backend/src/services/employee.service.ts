@@ -2,8 +2,20 @@ import { PrismaClient } from '@prisma/client';
 import { prisma } from '../utils/prisma';
 import bcrypt from 'bcryptjs';
 
+import { slugify } from '../utils/slug.utils';
+
 export const createEmployee = async (data: any) => {
-    const { firstName, lastName, email, password, roleId, departmentId, ...profileData } = data;
+    const { firstName, lastName, email, password, roleId, departmentId, teamId, ...profileData } = data;
+
+    // Generate slug
+    let slug = slugify(`${firstName} ${lastName}`);
+    let counter = 1;
+    let baseSlug = slug;
+
+    while (await prisma.user.findUnique({ where: { slug } })) {
+        slug = `${baseSlug}-${counter}`;
+        counter++;
+    }
 
     const hashedPassword = await bcrypt.hash(password || 'Welcome123', 10);
 
@@ -12,8 +24,11 @@ export const createEmployee = async (data: any) => {
             firstName,
             lastName,
             email,
+            slug,
             password: hashedPassword,
             roleId,
+            departmentId,
+            teamId,
             employeeProfile: {
                 create: {
                     ...profileData,
@@ -30,7 +45,9 @@ export const createEmployee = async (data: any) => {
         },
         include: {
             role: true,
-            employeeProfile: true
+            employeeProfile: true,
+            department: true,
+            team: true
         }
     });
 };
@@ -47,17 +64,22 @@ export const getAllEmployees = async () => {
         where: {}, // Return all users including Admins
         include: {
             role: true,
-            employeeProfile: true
+            employeeProfile: true,
+            department: true,
+            team: true
         }
     });
 };
 
-export const getEmployeeById = async (id: string) => {
+export const getEmployeeById = async (idOrSlug: string) => {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrSlug);
+
     return await prisma.user.findUnique({
-        where: { id },
+        where: isUuid ? { id: idOrSlug } : { slug: idOrSlug },
         include: {
             role: true,
             employeeProfile: true,
+            department: true,
             team: {
                 include: { department: true }
             }
@@ -66,29 +88,65 @@ export const getEmployeeById = async (id: string) => {
 };
 
 export const updateEmployeeById = async (id: string, data: any) => {
-    const { employeeProfile, ...userData } = data;
+    const { employeeProfile, isDepartmentManager, isTeamLeader, ...rawUserData } = data;
 
-    // Helper to sanitize dates
+    // Resolve ID if it's a slug
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    let targetId = id;
+
+    if (!isUuid) {
+        const user = await prisma.user.findUnique({ where: { slug: id } });
+        if (!user) throw new Error('Employee not found');
+        targetId = user.id;
+    }
+
+    // 1. Whitelist User Fields
+    const allowedUserFields = ['firstName', 'lastName', 'email', 'slug', 'roleId', 'departmentId', 'teamId'];
+    const userData: any = {};
+    allowedUserFields.forEach(field => {
+        if (rawUserData[field] !== undefined) userData[field] = rawUserData[field];
+    });
+
+    // 2. Whitelist Profile Fields
+    const allowedProfileFields = [
+        'bio', 'jobTitle', 'phoneNumber', 'address', 'gender', 'personalEmail',
+        'workRegulationId', 'skills', 'attendanceRequired', 'tasksLogRequired',
+        'workOutsideOfficeAllowed', 'salary',
+        'dateOfBirth', 'employmentStartDate', 'employmentEndDate', 'joiningDate'
+    ];
+
     const sanitizeProfile = (profile: any) => {
         if (!profile) return {};
-        const { dateOfBirth, employmentStartDate, employmentEndDate, joiningDate, ...rest } = profile;
-        return {
-            ...rest,
-            ...(dateOfBirth && { dateOfBirth: new Date(dateOfBirth) }),
-            ...(employmentStartDate && { employmentStartDate: new Date(employmentStartDate) }),
-            ...(employmentEndDate && { employmentEndDate: new Date(employmentEndDate) }),
-            ...(joiningDate && { joiningDate: new Date(joiningDate) }),
-            ...(rest.attendanceRequired !== undefined && { attendanceRequired: rest.attendanceRequired }),
-            ...(rest.tasksLogRequired !== undefined && { tasksLogRequired: rest.tasksLogRequired }),
-            ...(rest.workOutsideOfficeAllowed !== undefined && { workOutsideOfficeAllowed: rest.workOutsideOfficeAllowed }),
-            ...(rest.salary && { salary: parseFloat(rest.salary.toString()) }),
-        };
+        const sanitized: any = {};
+
+        allowedProfileFields.forEach(field => {
+            if (profile[field] !== undefined) sanitized[field] = profile[field];
+        });
+
+        // Convert Dates and Numbers (Handle empty strings)
+        if (sanitized.dateOfBirth) sanitized.dateOfBirth = new Date(sanitized.dateOfBirth);
+        else if (sanitized.dateOfBirth === '') sanitized.dateOfBirth = null;
+
+        if (sanitized.employmentStartDate) sanitized.employmentStartDate = new Date(sanitized.employmentStartDate);
+        else if (sanitized.employmentStartDate === '') sanitized.employmentStartDate = null;
+
+        if (sanitized.employmentEndDate) sanitized.employmentEndDate = new Date(sanitized.employmentEndDate);
+        else if (sanitized.employmentEndDate === '') sanitized.employmentEndDate = null;
+
+        if (sanitized.joiningDate) sanitized.joiningDate = new Date(sanitized.joiningDate);
+        else if (sanitized.joiningDate === '') sanitized.joiningDate = null;
+
+        if (sanitized.salary) sanitized.salary = parseFloat(sanitized.salary.toString());
+        else if (sanitized.salary === '') sanitized.salary = null;
+
+        return sanitized;
     };
 
     const sanitizedProfile = sanitizeProfile(employeeProfile);
 
-    return await prisma.user.update({
-        where: { id },
+    // Update User and Profile
+    const updatedUser = await prisma.user.update({
+        where: { id: targetId },
         data: {
             ...userData,
             employeeProfile: {
@@ -97,9 +155,34 @@ export const updateEmployeeById = async (id: string, data: any) => {
                     update: sanitizedProfile
                 }
             }
-        }
+        },
+        include: { department: true, team: true }
     });
+
+    // Handle Department Manager Promotion/Demotion
+    if (userData.departmentId) {
+        if (isDepartmentManager) {
+            // Promote to Manager of current department
+            await prisma.department.update({
+                where: { id: userData.departmentId },
+                data: { managerId: targetId }
+            });
+        }
+    }
+
+    // Handle Team Leader Promotion
+    if (userData.teamId) {
+        if (isTeamLeader) {
+            await prisma.team.update({
+                where: { id: userData.teamId },
+                data: { leaderId: targetId }
+            });
+        }
+    }
+
+    return updatedUser;
 };
+
 
 export const upsertProfile = async (userId: string, data: any) => {
     // Separate dependents logic if strictly normalized, but here assuming simple data object

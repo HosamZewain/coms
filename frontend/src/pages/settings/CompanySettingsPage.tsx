@@ -9,6 +9,7 @@ import api from '../../lib/api';
 
 export default function CompanySettingsPage() {
     const [companyProfile, setCompanyProfile] = useState({ companyName: '', website: '', address: '' });
+    const [officeIp, setOfficeIp] = useState('');
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
 
@@ -16,10 +17,14 @@ export default function CompanySettingsPage() {
         const fetchProfile = async () => {
             setLoading(true);
             try {
-                const profileRes = await api.get('/company/profile');
+                const [profileRes, settingsRes] = await Promise.all([
+                    api.get('/company/profile'),
+                    api.get('/company/settings?keys=office_ip')
+                ]);
                 setCompanyProfile(profileRes.data.data || { companyName: '', website: '', address: '' });
+                setOfficeIp(settingsRes.data.data.office_ip || '');
             } catch (error) {
-                console.error('Failed to fetch company profile:', error);
+                console.error('Failed to fetch data:', error);
             } finally {
                 setLoading(false);
             }
@@ -30,8 +35,11 @@ export default function CompanySettingsPage() {
     const handleSaveProfile = async () => {
         setSaving(true);
         try {
-            await api.put('/company/profile', companyProfile);
-            alert('Company profile updated!');
+            await Promise.all([
+                api.put('/company/profile', companyProfile),
+                api.put('/company/settings', { office_ip: officeIp })
+            ]);
+            alert('Settings updated successfully!');
         } catch (error) {
             console.error('Failed to save profile:', error);
         } finally {
@@ -81,6 +89,30 @@ export default function CompanySettingsPage() {
                             onChange={(e) => setCompanyProfile({ ...companyProfile, address: e.target.value })}
                         />
                     </div>
+                </CardContent>
+            </Card>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>Attendance Configuration</CardTitle>
+                    <CardDescription>
+                        Configure restrictions for attendance tracking.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="officeIp">Office IP Address</Label>
+                        <Input
+                            id="officeIp"
+                            placeholder="e.g. 192.168.1.100 (Separate multiple IPs with commas)"
+                            value={officeIp}
+                            onChange={(e) => setOfficeIp(e.target.value)}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                            Employees punching in from "Office" location must match this IP address. Leave empty to allow any IP.
+                        </p>
+                    </div>
+
                     <Button onClick={handleSaveProfile} disabled={saving}>
                         {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                         Save Changes

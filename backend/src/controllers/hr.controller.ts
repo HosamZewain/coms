@@ -74,11 +74,30 @@ export const updateOvertimeStatus = catchAsync(async (req: any, res: Response) =
 // Documents
 export const uploadDocument = catchAsync(async (req: any, res: Response) => {
     const userId = req.user.userId;
-    const data = await hrService.uploadDocument(req.body, userId);
+    let url = req.body.url;
+
+    if (req.file) {
+        // Construct full URL for the uploaded file
+        // Assuming the backend serves 'uploads' statically or via a specific route
+        // We'll store the relative path or full URL depending on how profiles are handled
+        // For consistency with profile images, let's store a path that the frontend can resolve
+        url = `/uploads/documents/${req.file.filename}`;
+    }
+
+    if (!url) {
+        return res.status(400).json({ status: 'error', message: 'No document file or URL provided' });
+    }
+
+    const data = await hrService.uploadDocument({ ...req.body, url }, userId);
     res.status(201).json({ status: 'success', data });
 });
 
 export const getDocuments = catchAsync(async (req: any, res: Response) => {
     const data = await hrService.getDocuments();
     res.json({ status: 'success', data });
+});
+
+export const incrementView = catchAsync(async (req: any, res: Response) => {
+    await hrService.incrementDocumentView(req.params.id);
+    res.json({ status: 'success' });
 });

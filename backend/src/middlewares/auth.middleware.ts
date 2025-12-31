@@ -34,7 +34,9 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
 
 export const authorize = (roles: string[]) => {
     return (req: AuthRequest, res: Response, next: NextFunction) => {
-        if (!req.user || !roles.includes(req.user.role.toUpperCase())) {
+        // Normalize both sides to upper case for comparison
+        const upperRoles = roles.map(r => r.toUpperCase());
+        if (!req.user || !upperRoles.includes(req.user.role.toUpperCase())) { // Bug fix: was checking against mixed case roles
             return next(new AppError('Forbidden: Role not authorized', 403));
         }
         next();

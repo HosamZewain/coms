@@ -8,5 +8,6 @@ router.use(authenticate);
 
 router.get('/dashboard-stats', authorizePermission('reports', 'view'), reportingController.getDashboardStats);
 router.get('/system-logs', authorizePermission('reports', 'view'), reportingController.getSystemLogs);
+router.get('/audit-logs', authorizePermission('reports', 'view'), reportingController.getAuditLogs);
 
 export default router;

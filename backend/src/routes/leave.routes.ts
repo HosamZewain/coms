@@ -15,4 +15,8 @@ router.get('/', authorize(['Admin', 'HR']), leaveController.getAllLeaves);
 router.patch('/:id/status', authorize(['Admin', 'HR']), leaveController.updateLeaveStatus);
 router.delete('/:id', authorize(['Admin', 'HR']), leaveController.deleteLeave);
 
+// Balance Management
+router.get('/:userId/balance', authorize(['Admin', 'HR']), leaveController.getBalances);
+router.patch('/:userId/balance', authorize(['Admin', 'HR']), leaveController.updateBalance);
+
 export default router;

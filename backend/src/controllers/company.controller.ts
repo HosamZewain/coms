@@ -17,7 +17,8 @@ export const getDepartments = catchAsync(async (req: Request, res: Response) => 
 export const createDepartment = catchAsync(async (req: Request, res: Response, next: NextFunction) => {
     try {
         const { name } = nameSchema.parse(req.body);
-        const data = await companyService.createDepartment(name);
+        const managerId = req.body.managerId;
+        const data = await companyService.createDepartment(name, managerId);
         res.status(201).json({ status: 'success', data });
     } catch (error) {
         console.error('CREATE DEPT ERROR:', error);
@@ -28,7 +29,8 @@ export const createDepartment = catchAsync(async (req: Request, res: Response, n
 export const updateDepartment = catchAsync(async (req: Request, res: Response) => {
     const { id } = req.params;
     const { name } = nameSchema.parse(req.body);
-    const data = await companyService.updateDepartment(id, name);
+    const managerId = req.body.managerId;
+    const data = await companyService.updateDepartment(id, name, managerId);
     res.json({ status: 'success', data });
 });
 
@@ -36,6 +38,30 @@ export const deleteDepartment = catchAsync(async (req: Request, res: Response) =
     const { id } = req.params;
     await companyService.deleteDepartment(id);
     res.json({ status: 'success', message: 'Department deleted' });
+});
+
+// Teams
+export const getTeams = catchAsync(async (req: Request, res: Response) => {
+    const { departmentId } = req.query;
+    const data = await companyService.getTeams(departmentId as string);
+    res.json({ status: 'success', data });
+});
+
+export const createTeam = catchAsync(async (req: Request, res: Response) => {
+    const data = await companyService.createTeam(req.body);
+    res.status(201).json({ status: 'success', data });
+});
+
+export const updateTeam = catchAsync(async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const data = await companyService.updateTeam(id, req.body);
+    res.json({ status: 'success', data });
+});
+
+export const deleteTeam = catchAsync(async (req: Request, res: Response) => {
+    const { id } = req.params;
+    await companyService.deleteTeam(id);
+    res.json({ status: 'success', message: 'Team deleted' });
 });
 
 // Positions

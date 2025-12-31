@@ -9,14 +9,18 @@ import { errorHandler } from './utils/error';
 const app = express();
 const logger = pino();
 
-app.use(helmet());
+app.use(helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" }
+}));
 app.use(cors());
 app.use(express.json());
 
 import path from 'path';
 
 import { actionLogger } from './middlewares/logger.middleware';
+import { auditMiddleware } from './middlewares/audit.middleware';
 app.use(actionLogger);
+app.use(auditMiddleware); // Register global audit logger
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 app.use('/api/auth', authRoutes);
@@ -44,6 +48,8 @@ import leaveRoutes from './routes/leave.routes';
 app.use('/api/leaves', leaveRoutes);
 import holidayRoutes from './routes/holiday.routes';
 app.use('/api/holidays', holidayRoutes);
+import overtimeRoutes from './routes/overtime.routes';
+app.use('/api/overtime', overtimeRoutes);
 import payrollRoutes from './routes/payroll.routes';
 app.use('/api/payroll', payrollRoutes);
 import boardRoutes from './routes/board.routes';

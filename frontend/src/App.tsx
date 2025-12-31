@@ -26,6 +26,9 @@ import OvertimePage from './pages/hr/OvertimePage';
 import PayrollPage from './pages/hr/PayrollPage';
 import AwardsPage from './pages/hr/AwardsPage';
 import DocumentsPage from './pages/hr/DocumentsPage';
+import ApprovalsPage from './pages/hr/ApprovalsPage';
+import TeamPage from './pages/team/TeamPage';
+
 import WorkRegulationsPage from './pages/settings/WorkRegulationsPage';
 import AwardsSetupPage from './pages/settings/AwardsSetupPage';
 import AttendanceReportPage from './pages/reports/AttendanceReportPage';
@@ -80,6 +83,17 @@ function App() {
             <ProtectedRoute>
               <DashboardLayout>
                 <DashboardPage />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/team"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout>
+                <TeamPage />
               </DashboardLayout>
             </ProtectedRoute>
           }
@@ -373,6 +387,16 @@ function App() {
             <ProtectedRoute>
               <DashboardLayout>
                 <AwardsPage />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/hr/approvals"
+          element={
+            <ProtectedRoute allowedRoles={['Admin', 'HR', 'Director', 'Manager']}>
+              <DashboardLayout>
+                <ApprovalsPage />
               </DashboardLayout>
             </ProtectedRoute>
           }

@@ -12,6 +12,7 @@ import {
     TableRow,
 } from "../../components/ui/table"
 import { Avatar, AvatarFallback, AvatarImage } from '../../components/ui/avatar';
+import { getProfileImageUrl } from '../../lib/utils';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -107,7 +108,7 @@ export default function EmployeeListPage() {
                                 <TableRow key={employee.id}>
                                     <TableCell>
                                         <Avatar>
-                                            <AvatarImage src={employee.employeeProfile?.profileImage} />
+                                            <AvatarImage src={getProfileImageUrl(employee.employeeProfile?.profileImage)} />
                                             <AvatarFallback>{employee.firstName[0]}{employee.lastName[0]}</AvatarFallback>
                                         </Avatar>
                                     </TableCell>
@@ -130,12 +131,12 @@ export default function EmployeeListPage() {
                                             </DropdownMenuTrigger>
                                             <DropdownMenuContent align="end">
                                                 <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                                <DropdownMenuItem onClick={() => navigate(`/employees/${employee.id}`)}>
+                                                <DropdownMenuItem onClick={() => navigate(`/employees/${employee.slug || employee.id}`)}>
                                                     View Profile
                                                 </DropdownMenuItem>
 
                                                 {checkPermission('employees', 'edit') && (
-                                                    <DropdownMenuItem onClick={() => navigate(`/employees/${employee.id}?edit=true`)}>
+                                                    <DropdownMenuItem onClick={() => navigate(`/employees/${employee.slug || employee.id}?edit=true`)}>
                                                         Edit Details
                                                     </DropdownMenuItem>
                                                 )}

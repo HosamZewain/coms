@@ -171,7 +171,7 @@ export default function ProjectListPage() {
                                 <TableRow
                                     key={project.id}
                                     className="cursor-pointer hover:bg-muted/50"
-                                    onClick={() => navigate(`/projects/${project.id}`)}
+                                    onClick={() => navigate(`/projects/${project.slug || project.id}`)}
                                 >
                                     <TableCell className="font-medium">
                                         <div className="flex flex-col">
@@ -206,7 +206,7 @@ export default function ProjectListPage() {
                                                 size="icon"
                                                 onClick={(e) => {
                                                     e.stopPropagation();
-                                                    navigate(`/projects/${project.id}`);
+                                                    navigate(`/projects/${project.slug || project.id}`);
                                                 }}
                                                 title="View Dashboard"
                                             >
@@ -218,7 +218,7 @@ export default function ProjectListPage() {
                                                     size="icon"
                                                     onClick={(e) => {
                                                         e.stopPropagation();
-                                                        navigate(`/projects/${project.id}/settings`);
+                                                        navigate(`/projects/${project.slug || project.id}/settings`);
                                                     }}
                                                     title="Edit Settings"
                                                 >
