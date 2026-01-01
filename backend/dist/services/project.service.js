@@ -1,20 +1,19 @@
-import { prisma } from '../utils/prisma';
-import { AppError } from '../utils/error';
-
-import { slugify } from '../utils/slug.utils';
-
-export const createProject = async (data: any) => {
-    let slug = slugify(data.name);
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.removeMember = exports.addMember = exports.deleteProject = exports.updateProject = exports.getProjectMembers = exports.getProjectById = exports.getAllProjects = exports.createProject = void 0;
+const prisma_1 = require("../utils/prisma");
+const error_1 = require("../utils/error");
+const slug_utils_1 = require("../utils/slug.utils");
+const createProject = async (data) => {
+    let slug = (0, slug_utils_1.slugify)(data.name);
     let counter = 1;
     let baseSlug = slug;
-
     // Ensure uniqueness
-    while (await prisma.project.findUnique({ where: { slug } })) {
+    while (await prisma_1.prisma.project.findUnique({ where: { slug } })) {
         slug = `${baseSlug}-${counter}`;
         counter++;
     }
-
-    return await prisma.project.create({
+    return await prisma_1.prisma.project.create({
         data: {
             name: data.name,
             slug,
@@ -26,15 +25,15 @@ export const createProject = async (data: any) => {
         }
     });
 };
-
-export const getAllProjects = async (filters: any = {}) => {
+exports.createProject = createProject;
+const getAllProjects = async (filters = {}) => {
     const { status, department } = filters;
-    const where: any = {};
-
-    if (status) where.status = status;
-    if (department) where.department = department;
-
-    return await prisma.project.findMany({
+    const where = {};
+    if (status)
+        where.status = status;
+    if (department)
+        where.department = department;
+    return await prisma_1.prisma.project.findMany({
         where,
         orderBy: { createdAt: 'desc' },
         include: {
@@ -47,11 +46,10 @@ export const getAllProjects = async (filters: any = {}) => {
         }
     });
 };
-
-export const getProjectById = async (idOrSlug: string) => {
+exports.getAllProjects = getAllProjects;
+const getProjectById = async (idOrSlug) => {
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrSlug);
-
-    const project = await prisma.project.findUnique({
+    const project = await prisma_1.prisma.project.findUnique({
         where: isUuid ? { id: idOrSlug } : { slug: idOrSlug },
         include: {
             tasks: {
@@ -104,13 +102,13 @@ export const getProjectById = async (idOrSlug: string) => {
             }
         }
     });
-
-    if (!project) throw new AppError('Project not found', 404);
+    if (!project)
+        throw new error_1.AppError('Project not found', 404);
     return project;
 };
-
-export const getProjectMembers = async (projectId: string) => {
-    const project = await prisma.project.findUnique({
+exports.getProjectById = getProjectById;
+const getProjectMembers = async (projectId) => {
+    const project = await prisma_1.prisma.project.findUnique({
         where: { id: projectId },
         include: {
             members: {
@@ -124,30 +122,27 @@ export const getProjectMembers = async (projectId: string) => {
             }
         }
     });
-
-    if (!project) throw new AppError('Project not found', 404);
+    if (!project)
+        throw new error_1.AppError('Project not found', 404);
     return project.members;
 };
-
-export const updateProject = async (id: string, data: any) => {
-    const project = await prisma.project.findUnique({ where: { id } });
-    if (!project) throw new AppError('Project not found', 404);
-
+exports.getProjectMembers = getProjectMembers;
+const updateProject = async (id, data) => {
+    const project = await prisma_1.prisma.project.findUnique({ where: { id } });
+    if (!project)
+        throw new error_1.AppError('Project not found', 404);
     let slug = project.slug;
-
     // If name changes, regenerate slug
     if (data.name && data.name !== project.name) {
-        slug = slugify(data.name);
+        slug = (0, slug_utils_1.slugify)(data.name);
         let counter = 1;
         let baseSlug = slug;
-
-        while (await prisma.project.findUnique({ where: { slug } })) {
+        while (await prisma_1.prisma.project.findUnique({ where: { slug } })) {
             slug = `${baseSlug}-${counter}`;
             counter++;
         }
     }
-
-    return await prisma.project.update({
+    return await prisma_1.prisma.project.update({
         where: { id },
         data: {
             ...data,
@@ -157,10 +152,10 @@ export const updateProject = async (id: string, data: any) => {
         }
     });
 };
-
-export const deleteProject = async (id: string, actorUserId?: string) => {
+exports.updateProject = updateProject;
+const deleteProject = async (id, actorUserId) => {
     // Fetch complete project details before deletion for logging
-    const project = await prisma.project.findUnique({
+    const project = await prisma_1.prisma.project.findUnique({
         where: { id },
         include: {
             tasks: {
@@ -179,11 +174,9 @@ export const deleteProject = async (id: string, actorUserId?: string) => {
             // epics relation does not exist on Project in schema
         }
     });
-
     if (!project) {
-        throw new AppError('Project not found', 404);
+        throw new error_1.AppError('Project not found', 404);
     }
-
     // Prepare detailed metadata for activity log
     const deletionMetadata = {
         name: project.name,
@@ -199,28 +192,22 @@ export const deleteProject = async (id: string, actorUserId?: string) => {
             assignees: t.assignments.map(a => a.user ? `${a.user.firstName} ${a.user.lastName}` : 'Unknown')
         }))
     };
-
     // Delete all related records first to avoid foreign key constraints
-    await prisma.$transaction(async (tx) => {
+    await prisma_1.prisma.$transaction(async (tx) => {
         // Get all tasks for this project
         const tasks = await tx.task.findMany({ where: { projectId: id } });
         const taskIds = tasks.map(t => t.id);
-
         // Delete all task-related records
         if (taskIds.length > 0) {
             await tx.taskActivity.deleteMany({ where: { taskId: { in: taskIds } } });
             await tx.taskAssignment.deleteMany({ where: { taskId: { in: taskIds } } });
             await tx.taskComment.deleteMany({ where: { taskId: { in: taskIds } } });
         }
-
         // Delete tasks
         await tx.task.deleteMany({ where: { projectId: id } });
-
         // Delete milestones (Cascading delete for Milestones)
         await tx.milestone.deleteMany({ where: { projectId: id } });
-
         // Note: Epics do not have projectId in this schema version, so no cascade needed/possible here directly.
-
         // Log the deletion activity with full details using AuditLog instead
         if (actorUserId) {
             await tx.auditLog.create({
@@ -232,22 +219,20 @@ export const deleteProject = async (id: string, actorUserId?: string) => {
                 }
             });
         }
-
         // Finally delete the project
         await tx.project.delete({ where: { id } });
     });
-
     return { deleted: true, project: deletionMetadata };
 };
-
-export const addMember = async (projectId: string, userId: string) => {
-    const project = await prisma.project.findUnique({ where: { id: projectId } });
-    if (!project) throw new AppError('Project not found', 404);
-
-    const user = await prisma.user.findUnique({ where: { id: userId } });
-    if (!user) throw new AppError('User not found', 404);
-
-    return await prisma.project.update({
+exports.deleteProject = deleteProject;
+const addMember = async (projectId, userId) => {
+    const project = await prisma_1.prisma.project.findUnique({ where: { id: projectId } });
+    if (!project)
+        throw new error_1.AppError('Project not found', 404);
+    const user = await prisma_1.prisma.user.findUnique({ where: { id: userId } });
+    if (!user)
+        throw new error_1.AppError('User not found', 404);
+    return await prisma_1.prisma.project.update({
         where: { id: projectId },
         data: {
             members: {
@@ -267,12 +252,12 @@ export const addMember = async (projectId: string, userId: string) => {
         }
     });
 };
-
-export const removeMember = async (projectId: string, userId: string) => {
-    const project = await prisma.project.findUnique({ where: { id: projectId } });
-    if (!project) throw new AppError('Project not found', 404);
-
-    return await prisma.project.update({
+exports.addMember = addMember;
+const removeMember = async (projectId, userId) => {
+    const project = await prisma_1.prisma.project.findUnique({ where: { id: projectId } });
+    if (!project)
+        throw new error_1.AppError('Project not found', 404);
+    return await prisma_1.prisma.project.update({
         where: { id: projectId },
         data: {
             members: {
@@ -281,3 +266,4 @@ export const removeMember = async (projectId: string, userId: string) => {
         }
     });
 };
+exports.removeMember = removeMember;

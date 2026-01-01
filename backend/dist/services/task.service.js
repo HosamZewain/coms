@@ -1,31 +1,10 @@
-import { prisma } from '../utils/prisma';
-import { AppError } from '../utils/error';
-
-interface CreateTaskInput {
-    title: string;
-    description?: string;
-    type?: 'TASK' | 'BUG' | 'SPIKE' | 'CHORE';
-    priority?: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
-    status?: string;
-    estimatePoints?: number;
-
-    boardId?: string;
-    planId?: string;
-    milestoneId?: string;
-    epicId?: string;
-
-    assigneeIds?: string[]; // New way
-    startDate?: string | Date;
-    dueDate?: string | Date;
-
-    createdByUserId: string;
-
-    // Legacy support if needed, but we migrate away
-    projectId?: string;
-}
-
-export const createTask = async (data: CreateTaskInput) => {
-    return await prisma.$transaction(async (tx) => {
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.removeAttachment = exports.addAttachment = exports.deleteComment = exports.addComment = exports.removeAssignee = exports.addAssignee = exports.deleteTask = exports.updateTask = exports.getTask = exports.getTasks = exports.createTask = void 0;
+const prisma_1 = require("../utils/prisma");
+const error_1 = require("../utils/error");
+const createTask = async (data) => {
+    return await prisma_1.prisma.$transaction(async (tx) => {
         // Create Task
         const task = await tx.task.create({
             data: {
@@ -33,21 +12,18 @@ export const createTask = async (data: CreateTaskInput) => {
                 description: data.description,
                 type: data.type || 'TASK',
                 priority: data.priority || 'MEDIUM',
-                status: data.status ? (data.status as any) : 'TODO',
+                status: data.status ? data.status : 'TODO',
                 estimatePoints: data.estimatePoints,
-
                 boardId: data.boardId,
                 planId: data.planId,
                 milestoneId: data.milestoneId,
                 epicId: data.epicId,
                 projectId: data.projectId, // Legacy
-
                 startDate: data.startDate ? new Date(data.startDate) : undefined,
                 dueDate: data.dueDate ? new Date(data.dueDate) : undefined,
                 createdByUserId: data.createdByUserId,
             }
         });
-
         // Handle Assignments
         if (data.assigneeIds && data.assigneeIds.length > 0) {
             await tx.taskAssignment.createMany({
@@ -57,7 +33,6 @@ export const createTask = async (data: CreateTaskInput) => {
                 }))
             });
         }
-
         // Log Activity
         await tx.taskActivity.create({
             data: {
@@ -67,42 +42,28 @@ export const createTask = async (data: CreateTaskInput) => {
                 meta: JSON.stringify({ title: task.title })
             }
         });
-
         return task;
     });
 };
-
-interface GetTasksFilter {
-    boardId?: string;
-    planId?: string;
-    milestoneId?: string;
-    epicId?: string;
-    projectId?: string; // Legacy
-    status?: string[];
-    priority?: string[];
-    assigneeIds?: string[];
-    search?: string;
-    dueDateFrom?: string | Date;
-    dueDateTo?: string | Date;
-}
-
-export const getTasks = async (filters: GetTasksFilter) => {
-    const where: any = {};
-
-    if (filters.boardId) where.boardId = filters.boardId;
-    if (filters.planId) where.planId = filters.planId;
-    if (filters.milestoneId) where.milestoneId = filters.milestoneId;
-    if (filters.epicId) where.epicId = filters.epicId;
-    if (filters.projectId) where.projectId = filters.projectId; // Legacy
-
+exports.createTask = createTask;
+const getTasks = async (filters) => {
+    const where = {};
+    if (filters.boardId)
+        where.boardId = filters.boardId;
+    if (filters.planId)
+        where.planId = filters.planId;
+    if (filters.milestoneId)
+        where.milestoneId = filters.milestoneId;
+    if (filters.epicId)
+        where.epicId = filters.epicId;
+    if (filters.projectId)
+        where.projectId = filters.projectId; // Legacy
     if (filters.status && filters.status.length > 0) {
         where.status = { in: filters.status };
     }
-
     if (filters.priority && filters.priority.length > 0) {
         where.priority = { in: filters.priority };
     }
-
     if (filters.assigneeIds && filters.assigneeIds.length > 0) {
         where.assignments = {
             some: {
@@ -110,21 +71,20 @@ export const getTasks = async (filters: GetTasksFilter) => {
             }
         };
     }
-
     if (filters.dueDateFrom || filters.dueDateTo) {
         where.dueDate = {};
-        if (filters.dueDateFrom) where.dueDate.gte = new Date(filters.dueDateFrom);
-        if (filters.dueDateTo) where.dueDate.lte = new Date(filters.dueDateTo);
+        if (filters.dueDateFrom)
+            where.dueDate.gte = new Date(filters.dueDateFrom);
+        if (filters.dueDateTo)
+            where.dueDate.lte = new Date(filters.dueDateTo);
     }
-
     if (filters.search) {
         where.OR = [
             { title: { contains: filters.search, mode: 'insensitive' } },
             { description: { contains: filters.search, mode: 'insensitive' } }
         ];
     }
-
-    return await prisma.task.findMany({
+    return await prisma_1.prisma.task.findMany({
         where,
         include: {
             assignments: {
@@ -140,9 +100,9 @@ export const getTasks = async (filters: GetTasksFilter) => {
         orderBy: { createdAt: 'desc' }
     });
 };
-
-export const getTask = async (id: string) => {
-    const task = await prisma.task.findUnique({
+exports.getTasks = getTasks;
+const getTask = async (id) => {
+    const task = await prisma_1.prisma.task.findUnique({
         where: { id },
         include: {
             assignments: {
@@ -167,17 +127,18 @@ export const getTask = async (id: string) => {
             }
         }
     });
-    if (!task) throw new AppError('Task not found', 404);
+    if (!task)
+        throw new error_1.AppError('Task not found', 404);
     return task;
 };
-
-export const updateTask = async (id: string, data: any, actorUserId: string) => {
+exports.getTask = getTask;
+const updateTask = async (id, data, actorUserId) => {
     // We should track changes for activity log
     // For simplicity, just update and log generic "updated"
-    const task = await prisma.task.findUnique({ where: { id } });
-    if (!task) throw new AppError('Task not found', 404);
-
-    return await prisma.$transaction(async (tx) => {
+    const task = await prisma_1.prisma.task.findUnique({ where: { id } });
+    if (!task)
+        throw new error_1.AppError('Task not found', 404);
+    return await prisma_1.prisma.$transaction(async (tx) => {
         const updated = await tx.task.update({
             where: { id },
             data: {
@@ -194,7 +155,6 @@ export const updateTask = async (id: string, data: any, actorUserId: string) => 
                 dueDate: data.dueDate ? new Date(data.dueDate) : undefined,
             }
         });
-
         // Detailed activity logging could go here (diffing task vs updated)
         if (task.status !== updated.status) {
             await tx.taskActivity.create({
@@ -205,7 +165,8 @@ export const updateTask = async (id: string, data: any, actorUserId: string) => 
                     meta: JSON.stringify({ from: task.status, to: updated.status })
                 }
             });
-        } else {
+        }
+        else {
             await tx.taskActivity.create({
                 data: {
                     taskId: id,
@@ -214,14 +175,13 @@ export const updateTask = async (id: string, data: any, actorUserId: string) => 
                 }
             });
         }
-
         return updated;
     });
 };
-
-export const deleteTask = async (id: string, actorUserId?: string) => {
+exports.updateTask = updateTask;
+const deleteTask = async (id, actorUserId) => {
     // Fetch complete task details before deletion for logging
-    const task = await prisma.task.findUnique({
+    const task = await prisma_1.prisma.task.findUnique({
         where: { id },
         include: {
             project: { select: { name: true } },
@@ -233,11 +193,9 @@ export const deleteTask = async (id: string, actorUserId?: string) => {
             comments: { select: { id: true, body: true } }
         }
     });
-
     if (!task) {
-        throw new AppError('Task not found', 404);
+        throw new error_1.AppError('Task not found', 404);
     }
-
     // Prepare detailed metadata for activity log
     const deletionMetadata = {
         title: task.title,
@@ -251,18 +209,14 @@ export const deleteTask = async (id: string, actorUserId?: string) => {
         startDate: task.startDate,
         dueDate: task.dueDate
     };
-
     // Delete related records first to avoid foreign key constraints
-    await prisma.$transaction(async (tx) => {
+    await prisma_1.prisma.$transaction(async (tx) => {
         // Delete task activities
         await tx.taskActivity.deleteMany({ where: { taskId: id } });
-
         // Delete task assignments
         await tx.taskAssignment.deleteMany({ where: { taskId: id } });
-
         // Delete task comments
         await tx.taskComment.deleteMany({ where: { taskId: id } });
-
         // Log the deletion activity with full details using AuditLog
         if (actorUserId) {
             await tx.auditLog.create({
@@ -274,22 +228,18 @@ export const deleteTask = async (id: string, actorUserId?: string) => {
                 }
             });
         }
-
         // Finally delete the task itself
         await tx.task.delete({ where: { id } });
     });
-
     return { deleted: true, task: deletionMetadata };
 };
-
-
+exports.deleteTask = deleteTask;
 // Assignment Logic
-export const addAssignee = async (taskId: string, userId: string, actorUserId: string) => {
-    return await prisma.$transaction(async (tx) => {
+const addAssignee = async (taskId, userId, actorUserId) => {
+    return await prisma_1.prisma.$transaction(async (tx) => {
         const assignment = await tx.taskAssignment.create({
             data: { taskId, userId }
         });
-
         await tx.taskActivity.create({
             data: {
                 taskId,
@@ -301,13 +251,12 @@ export const addAssignee = async (taskId: string, userId: string, actorUserId: s
         return assignment;
     });
 };
-
-export const removeAssignee = async (taskId: string, userId: string, actorUserId: string) => {
-    return await prisma.$transaction(async (tx) => {
+exports.addAssignee = addAssignee;
+const removeAssignee = async (taskId, userId, actorUserId) => {
+    return await prisma_1.prisma.$transaction(async (tx) => {
         const result = await tx.taskAssignment.deleteMany({
             where: { taskId, userId }
         });
-
         await tx.taskActivity.create({
             data: {
                 taskId,
@@ -319,10 +268,10 @@ export const removeAssignee = async (taskId: string, userId: string, actorUserId
         return result;
     });
 };
-
+exports.removeAssignee = removeAssignee;
 // Comments
-export const addComment = async (taskId: string, body: string, authorUserId: string) => {
-    const comment = await prisma.taskComment.create({
+const addComment = async (taskId, body, authorUserId) => {
+    const comment = await prisma_1.prisma.taskComment.create({
         data: {
             body,
             task: { connect: { id: taskId } },
@@ -334,23 +283,22 @@ export const addComment = async (taskId: string, body: string, authorUserId: str
     });
     return comment;
 };
-
-export const deleteComment = async (commentId: string, actorUserId: string) => {
-    const comment = await prisma.taskComment.findUnique({ where: { id: commentId } });
-    if (!comment) throw new AppError('Comment not found', 404);
-
+exports.addComment = addComment;
+const deleteComment = async (commentId, actorUserId) => {
+    const comment = await prisma_1.prisma.taskComment.findUnique({ where: { id: commentId } });
+    if (!comment)
+        throw new error_1.AppError('Comment not found', 404);
     // Only author or admin can delete (simplified)
     if (comment.authorUserId !== actorUserId) {
         // Check role logic if needed, for now restrict to author
         // throw new AppError('Not authorized', 403);
     }
-
-    return await prisma.taskComment.delete({ where: { id: commentId } });
+    return await prisma_1.prisma.taskComment.delete({ where: { id: commentId } });
 };
-
+exports.deleteComment = deleteComment;
 // Attachments
-export const addAttachment = async (taskId: string, file: any, userId: string) => {
-    return await prisma.taskAttachment.create({
+const addAttachment = async (taskId, file, userId) => {
+    return await prisma_1.prisma.taskAttachment.create({
         data: {
             taskId,
             userId,
@@ -364,17 +312,18 @@ export const addAttachment = async (taskId: string, file: any, userId: string) =
         }
     });
 };
-
-export const removeAttachment = async (attachmentId: string) => {
-    const attachment = await prisma.taskAttachment.findUnique({ where: { id: attachmentId } });
-    if (!attachment) throw new AppError('Attachment not found', 404);
-
+exports.addAttachment = addAttachment;
+const removeAttachment = async (attachmentId) => {
+    const attachment = await prisma_1.prisma.taskAttachment.findUnique({ where: { id: attachmentId } });
+    if (!attachment)
+        throw new error_1.AppError('Attachment not found', 404);
     // Ideally delete file from disk too regarding fs logic
     try {
         // We'd need to import fs and path to delete, but for now just DB record
-    } catch (e) {
+    }
+    catch (e) {
         console.error('Failed to delete file from disk', e);
     }
-
-    return await prisma.taskAttachment.delete({ where: { id: attachmentId } });
+    return await prisma_1.prisma.taskAttachment.delete({ where: { id: attachmentId } });
 };
+exports.removeAttachment = removeAttachment;
