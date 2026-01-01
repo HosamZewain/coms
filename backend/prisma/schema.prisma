@@ -66,7 +66,7 @@ model User {
 model Role {
   id          String   @id @default(uuid())
   name        String   @unique // Admin, HR, Manager, Employee, TeamLeader
-  permissions String[]
+  permissions Json      @default("[]")
   users       User[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -302,7 +302,7 @@ model EmployeeProfile {
   jobTitle      String?
   profileImage  String?
   bio           String?
-  skills        String[]
+  skills        Json      @default("[]")
   dateOfBirth   DateTime?
   personalEmail String?
   phoneNumber   String?
@@ -364,7 +364,7 @@ model WorkRegulation {
   id          String   @id @default(uuid())
   name        String
   description String?
-  workingDays String[] // e.g. ["Sunday", "Monday", ...]
+  workingDays Json      @default("[]") // e.g. ["Sunday", "Monday", ...]
   startTime   String?  // "09:00"
   flexibleHours Int?   // minutes precision, e.g. 120
   workingHours Float?  // e.g. 8
@@ -445,7 +445,7 @@ model Notification {
 
 
 datasource db {
-  provider = "postgresql"
+  provider = "mysql"
   url      = env("DATABASE_URL")
 }
 
