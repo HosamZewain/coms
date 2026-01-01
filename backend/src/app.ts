@@ -65,6 +65,9 @@ app.use('/api/activities', activityRoutes);
 import dashboardRoutes from './routes/dashboard.routes';
 app.use('/api/dashboard', dashboardRoutes);
 
+import { initAttendanceJobs } from './jobs/attendance.jobs';
+initAttendanceJobs();
+
 app.get('/api/health', (req, res) => {
     res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
 });

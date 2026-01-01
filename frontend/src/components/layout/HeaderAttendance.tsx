@@ -62,7 +62,7 @@ export default function HeaderAttendance() {
     return (
         <div className="flex items-center gap-3 mr-4">
             {isCheckedIn && (
-                <div className="flex items-center gap-2 px-3 py-1.5 bg-green-50 text-green-700 rounded-md border border-green-100">
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-500/20 text-emerald-300 rounded-md border border-emerald-500/30">
                     <Clock className="h-4 w-4 animate-pulse" />
                     <span className="font-mono font-medium">{timer}</span>
                 </div>

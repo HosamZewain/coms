@@ -32,6 +32,7 @@ import TeamPage from './pages/team/TeamPage';
 import WorkRegulationsPage from './pages/settings/WorkRegulationsPage';
 import AwardsSetupPage from './pages/settings/AwardsSetupPage';
 import AttendanceReportPage from './pages/reports/AttendanceReportPage';
+import EmployeeMonthlyReportPage from './pages/reports/EmployeeMonthlyReportPage';
 import LogsPage from './pages/reports/LogsPage';
 import PublicJobBoard from './pages/public/PublicJobBoard';
 import PublicJobApplyPage from './pages/public/PublicJobApplyPage';
@@ -441,6 +442,16 @@ function App() {
             <ProtectedRoute allowedRoles={['Admin', 'HR', 'Director', 'Manager']}>
               <DashboardLayout>
                 <AttendanceReportPage />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/reports/employee-monthly"
+          element={
+            <ProtectedRoute allowedRoles={['Admin', 'HR', 'Director', 'Manager']}>
+              <DashboardLayout>
+                <EmployeeMonthlyReportPage />
               </DashboardLayout>
             </ProtectedRoute>
           }

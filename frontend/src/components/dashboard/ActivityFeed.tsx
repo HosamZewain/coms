@@ -1,12 +1,15 @@
 import { useQuery } from '@tanstack/react-query';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Avatar, AvatarFallback } from '../ui/avatar';
 import { Clock, MessageSquare, UserPlus, Edit, CheckCircle, AlertCircle } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import api from '../../lib/api';
 import { useNavigate } from 'react-router-dom';
 
-export default function ActivityFeed() {
+interface ActivityFeedProps {
+    darkMode?: boolean;
+}
+
+export default function ActivityFeed({ darkMode = false }: ActivityFeedProps) {
     const navigate = useNavigate();
 
     const { data: activities, isLoading } = useQuery({
@@ -15,7 +18,7 @@ export default function ActivityFeed() {
             const res = await api.get('/activities/recent?limit=10');
             return res.data.data;
         },
-        refetchInterval: 30000 // Refresh every 30 seconds
+        refetchInterval: 30000
     });
 
     const getActivityIcon = (action: string) => {
@@ -42,74 +45,69 @@ export default function ActivityFeed() {
                 return `${actorName} updated "${taskTitle}"`;
             case 'status_changed':
                 const meta = activity.meta ? JSON.parse(activity.meta) : {};
-                return `${actorName} moved "${taskTitle}" from ${meta.from} to ${meta.to}`;
+                return `${actorName} moved "${taskTitle}" to ${meta.to}`;
             case 'assigned':
                 return `${actorName} assigned "${taskTitle}"`;
             case 'commented':
                 return `${actorName} commented on "${taskTitle}"`;
             default:
-                return `${actorName} performed an action on "${taskTitle}"`;
+                return `${actorName} performed an action`;
         }
     };
 
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle>Recent Activity</CardTitle>
-                <CardDescription>Latest updates from your team</CardDescription>
-            </CardHeader>
-            <CardContent>
-                {isLoading ? (
-                    <div className="space-y-3">
-                        {[1, 2, 3].map(i => (
-                            <div key={i} className="flex items-start gap-3 animate-pulse">
-                                <div className="h-8 w-8 rounded-full bg-muted" />
-                                <div className="flex-1 space-y-2">
-                                    <div className="h-4 bg-muted rounded w-3/4" />
-                                    <div className="h-3 bg-muted rounded w-1/2" />
-                                </div>
+        <div className="p-4">
+            {isLoading ? (
+                <div className="space-y-3">
+                    {[1, 2, 3].map(i => (
+                        <div key={i} className="flex items-start gap-3 animate-pulse">
+                            <div className={`h-8 w-8 rounded-full ${darkMode ? 'bg-white/10' : 'bg-muted'}`} />
+                            <div className="flex-1 space-y-2">
+                                <div className={`h-4 rounded w-3/4 ${darkMode ? 'bg-white/10' : 'bg-muted'}`} />
+                                <div className={`h-3 rounded w-1/2 ${darkMode ? 'bg-white/10' : 'bg-muted'}`} />
                             </div>
-                        ))}
-                    </div>
-                ) : !activities || activities.length === 0 ? (
-                    <p className="text-sm text-muted-foreground py-8 text-center">
-                        No recent activity to display
-                    </p>
-                ) : (
-                    <div className="space-y-4">
-                        {activities.map((activity: any) => (
-                            <div
-                                key={activity.id}
-                                className="flex items-start gap-3 hover:bg-accent/50 p-2 rounded-lg cursor-pointer transition-colors"
-                                onClick={() => {
-                                    if (activity.task?.id) {
-                                        navigate(`/projects/${activity.task.projectId}?task=${activity.task.id}`);
-                                    }
-                                }}
-                            >
-                                <div className="flex-shrink-0">
-                                    <Avatar className="h-8 w-8">
-                                        <AvatarFallback className="text-xs">
-                                            {activity.actor ? activity.actor.firstName[0] + activity.actor.lastName[0] : '?'}
-                                        </AvatarFallback>
-                                    </Avatar>
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex items-start gap-2">
-                                        {getActivityIcon(activity.action)}
-                                        <p className="text-sm">
-                                            {getActivityText(activity)}
-                                        </p>
-                                    </div>
-                                    <p className="text-xs text-muted-foreground mt-1">
-                                        {formatDistanceToNow(new Date(activity.createdAt), { addSuffix: true })}
+                        </div>
+                    ))}
+                </div>
+            ) : !activities || activities.length === 0 ? (
+                <p className={`text-sm py-8 text-center ${darkMode ? 'text-slate-500' : 'text-muted-foreground'}`}>
+                    No recent activity to display
+                </p>
+            ) : (
+                <div className="space-y-4">
+                    {activities.slice(0, 5).map((activity: any) => (
+                        <div
+                            key={activity.id}
+                            className={`flex items-start gap-3 p-2 rounded-lg cursor-pointer transition-colors ${darkMode ? 'hover:bg-white/5' : 'hover:bg-accent/50'
+                                }`}
+                            onClick={() => {
+                                if (activity.task?.id) {
+                                    navigate(`/projects/${activity.task.projectId}?task=${activity.task.id}`);
+                                }
+                            }}
+                        >
+                            <div className="flex-shrink-0">
+                                <Avatar className="h-8 w-8">
+                                    <AvatarFallback className={`text-xs ${darkMode ? 'bg-indigo-500/30 text-indigo-300' : ''}`}>
+                                        {activity.actor ? activity.actor.firstName[0] + activity.actor.lastName[0] : '?'}
+                                    </AvatarFallback>
+                                </Avatar>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <div className="flex items-start gap-2">
+                                    {getActivityIcon(activity.action)}
+                                    <p className={`text-sm ${darkMode ? 'text-slate-300' : ''}`}>
+                                        {getActivityText(activity)}
                                     </p>
                                 </div>
+                                <p className={`text-xs mt-1 ${darkMode ? 'text-slate-500' : 'text-muted-foreground'}`}>
+                                    {formatDistanceToNow(new Date(activity.createdAt), { addSuffix: true })}
+                                </p>
                             </div>
-                        ))}
-                    </div>
-                )}
-            </CardContent>
-        </Card>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
     );
 }

@@ -54,3 +54,16 @@ export const addManualAttendance = catchAsync(async (req: any, res: Response) =>
     const data = await attendanceService.addManualAttendance(userId, req.body);
     res.status(201).json({ status: 'success', data });
 });
+
+export const getEmployeeMonthlyReport = catchAsync(async (req: Request, res: Response) => {
+    const employeeId = req.query.employeeId as string;
+    const startDate = req.query.startDate ? new Date(req.query.startDate as string) : new Date();
+    const endDate = req.query.endDate ? new Date(req.query.endDate as string) : new Date();
+
+    if (!employeeId) {
+        return res.status(400).json({ status: 'error', message: 'Employee ID is required' });
+    }
+
+    const data = await attendanceService.getEmployeeMonthlyReport(employeeId, startDate, endDate);
+    res.json({ status: 'success', data });
+});

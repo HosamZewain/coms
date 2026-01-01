@@ -123,7 +123,6 @@ export const getDailyReport = async (date: Date) => {
     const endOfDay = new Date(date);
     endOfDay.setHours(23, 59, 59, 999);
 
-    // 1. Fetch All Employees (excluding admins if preferred, but usually report includes everyone)
     // 1. Fetch All Employees
     const employees = await prisma.user.findMany({
         include: {
@@ -135,18 +134,13 @@ export const getDailyReport = async (date: Date) => {
     });
 
     // 2. Fetch Attendance Records for the day
-    // 2. Fetch Attendance Records for the day (including overlapping sessions from previous days)
+    // Filtering by checkInTime to match dashboard logic and ensure data reset at midnight
     const attendanceRecords = await prisma.attendanceRecord.findMany({
         where: {
-            AND: [
-                { checkInTime: { lte: endOfDay } },
-                {
-                    OR: [
-                        { checkOutTime: { gte: startOfDay } },
-                        { checkOutTime: null }
-                    ]
-                }
-            ]
+            checkInTime: {
+                gte: startOfDay,
+                lte: endOfDay
+            }
         }
     });
 
@@ -277,4 +271,111 @@ export const addManualAttendance = async (userId: string, data: any) => {
             checkOutNotes: checkOut ? `Manual Entry` : null
         }
     });
+};
+
+export const getEmployeeMonthlyReport = async (employeeId: string, startDate: Date, endDate: Date) => {
+    // Normalize dates
+    const start = new Date(startDate);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(endDate);
+    end.setHours(23, 59, 59, 999);
+
+    // Fetch attendance records for the employee in the date range
+    const attendanceRecords = await prisma.attendanceRecord.findMany({
+        where: {
+            userId: employeeId,
+            checkInTime: {
+                gte: start,
+                lte: end
+            }
+        },
+        orderBy: { checkInTime: 'asc' }
+    });
+
+    // Fetch approved leaves for the employee in the date range
+    const leaves = await prisma.leaveRequest.findMany({
+        where: {
+            userId: employeeId,
+            status: 'APPROVED',
+            startDate: { lte: end },
+            endDate: { gte: start }
+        },
+        include: { leaveType: true }
+    });
+
+    // Fetch holidays in the date range
+    const holidays = await prisma.holiday.findMany({
+        where: {
+            date: {
+                gte: start,
+                lte: end
+            }
+        }
+    });
+
+    // Group attendance records by date
+    const recordsByDate: { [key: string]: any[] } = {};
+    attendanceRecords.forEach(record => {
+        const dateKey = new Date(record.checkInTime).toISOString().split('T')[0];
+        if (!recordsByDate[dateKey]) {
+            recordsByDate[dateKey] = [];
+        }
+        recordsByDate[dateKey].push(record);
+    });
+
+    // Build daily report
+    const dailyReports: any[] = [];
+    const currentDate = new Date(start);
+
+    while (currentDate <= end) {
+        const dateKey = currentDate.toISOString().split('T')[0];
+        const dayOfWeek = currentDate.getDay();
+        const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+        const dayRecords = recordsByDate[dateKey] || [];
+
+        // Check if it's a holiday
+        const holiday = holidays.find(h =>
+            new Date(h.date).toISOString().split('T')[0] === dateKey
+        );
+
+        // Check if employee is on leave
+        const leave = leaves.find(l =>
+            new Date(l.startDate) <= currentDate && new Date(l.endDate) >= currentDate
+        );
+
+        let status = 'ABSENT';
+        let leaveDetails = null;
+
+        if (dayRecords.length > 0) {
+            status = 'PRESENT';
+        } else if (holiday) {
+            status = 'HOLIDAY';
+        } else if (leave) {
+            status = 'ON_LEAVE';
+            leaveDetails = leave;
+        } else if (isWeekend) {
+            status = 'WEEKEND';
+        }
+
+        // Calculate total duration for the day
+        const totalDuration = dayRecords.reduce((acc, r) => {
+            if (r.checkOutTime) {
+                return acc + (new Date(r.checkOutTime).getTime() - new Date(r.checkInTime).getTime());
+            }
+            return acc;
+        }, 0);
+
+        dailyReports.push({
+            date: new Date(currentDate),
+            status,
+            records: dayRecords,
+            totalDuration,
+            leaveDetails
+        });
+
+        // Move to next day
+        currentDate.setDate(currentDate.getDate() + 1);
+    }
+
+    return dailyReports;
 };
